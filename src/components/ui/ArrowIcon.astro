@@ -1,0 +1,33 @@
+---
+/**
+ * ArrowIcon — small right-pointing arrow used inside pill CTAs and
+ * read-more links. Uses currentColor so it inherits text color.
+ */
+type Size = "xs" | "sm" | "md";
+
+interface Props {
+	size?: Size;
+	class?: string;
+}
+
+const { size = "sm", class: className = "" } = Astro.props;
+
+const SIZE_CLASS: Record<Size, string> = {
+	xs: "h-3 w-3",
+	sm: "h-3.5 w-3.5",
+	md: "h-4 w-4",
+};
+---
+
+<svg
+	class:list={[SIZE_CLASS[size], className]}
+	viewBox="0 0 14 14"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="2"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	aria-hidden="true"
+>
+	<path d="M1 7h12M8 2l5 5-5 5"></path>
+</svg>

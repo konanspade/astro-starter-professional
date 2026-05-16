@@ -1,0 +1,341 @@
+---
+/**
+ * Floating site header — two white pills that visually join with a
+ * gooey/metaball "two water drops merging" effect at the joint.
+ *
+ * Implementation:
+ *   1. A position:absolute background layer holds the two white pill
+ *      shapes (left = main, right = CTA wrapper). That layer has the
+ *      `goo` class which applies `filter: url(#goo)` — defined once in
+ *      MainLayout.astro. The blur+threshold matrix collapses overlapping
+ *      / near-overlapping white pixels into one continuous blob with a
+ *      smooth meniscus where the two pills meet.
+ *   2. A position:relative content layer on top holds the actual
+ *      logo / nav / search button / green CTA. No filter — they render
+ *      crisp.
+ *   3. The two background pills overlap by ~14px (negative margin) so
+ *      the goo filter has enough proximity to merge them at the joint.
+ */
+
+const NAV = [
+	{ label: "Products", href: "/our-products/" },
+	{ label: "Sectors", href: "/sectors/" },
+	{ label: "Solutions", href: "/solutions/" },
+	{ label: "About Us", href: "/about-us/" },
+	{ label: "Case Studies", href: "/case-studies/" },
+	{ label: "Blogs", href: "/news-updates/" },
+];
+
+const currentPath = Astro.url.pathname;
+function isActive(href: string): boolean {
+	if (href === "/") return currentPath === "/";
+	return currentPath === href || currentPath.startsWith(href);
+}
+---
+
+<header
+	class="group/h fixed top-6 right-4 left-4 z-50 transition-transform duration-300 ease-out sm:top-7 sm:right-5 sm:left-5"
+	role="banner"
+	data-site-header
+	data-scrolled="false"
+>
+	<div class="relative mx-auto max-w-[var(--container-site)] lg:px-6">
+		{/* Two clean separate pills with a small gap. No joint. */}
+		<div class="flex items-stretch gap-2">
+			{/* === LEFT PILL === */}
+			<div
+				class="flex flex-1 items-center gap-4 rounded-full bg-white p-2 pl-3 transition-colors duration-300 group-data-[scrolled=true]/h:bg-[#fafafa] sm:pl-5"
+			>
+				{/* Logo */}
+				<a href="/" class="flex shrink-0 items-center gap-2" rel="home">
+					<img
+						src="/ocean-logo.svg"
+						alt="Ocean Global"
+						class="h-8 w-8"
+						width="32"
+						height="32"
+					/>
+					<span class="font-display text-sm font-extrabold uppercase tracking-[0.04em] text-ink sm:text-base">
+						Ocean Global<sup class="ml-0.5 text-[9px] font-semibold text-ink/70">™</sup>
+					</span>
+				</a>
+
+				{/* Centered nav */}
+				<nav
+					class="hidden flex-1 items-center justify-center gap-7 lg:flex"
+					aria-label="Primary"
+				>
+					{
+						NAV.map((item) => (
+							<a
+								href={item.href}
+								class:list={[
+									"font-sans text-[15px] font-medium transition-colors",
+									isActive(item.href)
+										? "text-ink underline underline-offset-[6px] decoration-1"
+										: "text-ink hover:text-brand-blue",
+								]}
+								aria-current={isActive(item.href) ? "page" : undefined}
+							>
+								{item.label}
+							</a>
+						))
+					}
+				</nav>
+				<div class="flex-1 lg:hidden"></div>
+
+				{/* Search */}
+				<button
+					type="button"
+					class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink transition hover:bg-paper-cool/60"
+					aria-label="Open search"
+					aria-expanded="false"
+					aria-controls="site-search"
+					data-search-toggle
+				>
+					<svg
+						class="h-5 w-5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<circle cx="11" cy="11" r="7"></circle>
+						<path d="m20 20-3.5-3.5"></path>
+					</svg>
+				</button>
+				{/* Mobile menu toggle */}
+				<button
+					type="button"
+					class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink transition hover:bg-paper-cool/60 lg:hidden"
+					aria-label="Open menu"
+					aria-expanded="false"
+					aria-controls="mobile-nav"
+					data-mobile-nav-toggle
+				>
+					<svg
+						class="h-5 w-5"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 7h16M4 12h16M4 17h16"></path>
+					</svg>
+				</button>
+			</div>
+
+			{/* === BOWTIE JOINT SVG === wider canvas + cubic beziers so the
+			   waist curves blend smoothly into the pill rounded ends.
+			   The pills overlap this SVG by 20px each side; the bezier
+			   tangents at x=0 / x=80 match the pill curvature so there's
+			   no visible crease where they meet. */}
+			{/* === RIGHT PILL — uniform p-2 padding around CTA === */}
+			<div
+				class="hidden shrink-0 rounded-full bg-white p-2 transition-colors duration-300 group-data-[scrolled=true]/h:bg-[#fafafa] sm:block"
+			>
+				<a
+					href="/contact/"
+					class="inline-flex items-center gap-1.5 rounded-full bg-brand-accent px-5 py-2.5 font-sans text-[15px] font-semibold text-ink transition-colors hover:bg-brand-accent-hover"
+				>
+					Contact us
+				</a>
+			</div>
+		</div>
+	</div>
+
+	{/* Mobile drawer */}
+	<nav
+		id="mobile-nav"
+		class="mx-auto mt-2 hidden max-w-[var(--container-site)] rounded-3xl bg-white p-4 lg:hidden"
+		aria-label="Mobile primary"
+		data-mobile-nav
+	>
+		<ul class="flex flex-col">
+			{
+				NAV.map((item) => (
+					<li>
+						<a
+							href={item.href}
+							class:list={[
+								"block py-2.5 font-sans text-base font-medium",
+								isActive(item.href) ? "text-brand-blue" : "text-ink",
+							]}
+						>
+							{item.label}
+						</a>
+					</li>
+				))
+			}
+			<li class="mt-2 border-t border-black/5 pt-3">
+				<a
+					href="/contact/"
+					class="block rounded-full bg-brand-accent px-5 py-3 text-center font-sans text-sm font-semibold text-ink"
+				>
+					Contact us
+				</a>
+			</li>
+		</ul>
+	</nav>
+</header>
+
+{/* Search overlay */}
+<div
+	id="site-search"
+	class="fixed inset-0 z-[60] hidden bg-ink/40 backdrop-blur-sm"
+	data-search-overlay
+	role="dialog"
+	aria-modal="true"
+	aria-label="Search"
+>
+	<div class="mx-auto mt-28 max-w-2xl px-4">
+		<form
+			action="/"
+			method="get"
+			class="flex items-center gap-2 rounded-full bg-white p-2 shadow-2xl"
+			role="search"
+		>
+			<svg
+				class="ml-3 h-5 w-5 shrink-0 text-ink-mute"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="11" cy="11" r="7"></circle>
+				<path d="m20 20-3.5-3.5"></path>
+			</svg>
+			<input
+				type="search"
+				name="s"
+				placeholder="Search products, sectors, case studies…"
+				class="flex-1 bg-transparent px-2 py-2 font-sans text-base text-ink placeholder-ink-mute outline-none"
+				autocomplete="off"
+				data-search-input
+				required
+			/>
+			<button
+				type="submit"
+				class="rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-semibold text-ink hover:bg-brand-accent-hover"
+			>
+				Search
+			</button>
+			<button
+				type="button"
+				class="mr-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-mute hover:bg-paper-cool"
+				aria-label="Close search"
+				data-search-close
+			>
+				<svg
+					class="h-5 w-5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+				>
+					<path d="M6 6l12 12M6 18L18 6"></path>
+				</svg>
+			</button>
+		</form>
+	</div>
+</div>
+
+<script>
+	// === Scroll-direction reveal ===
+	// Sticky for the first 100px. After that, hide on downscroll, reveal
+	// on upscroll. Uses requestAnimationFrame for smooth perf and a small
+	// delta threshold to ignore jitter (trackpad inertia, etc).
+	(() => {
+		const header = document.querySelector("[data-site-header]");
+		if (!header) return;
+		// Header stays pinned for the first STICK_UNTIL pixels. Past that,
+		// downscroll hides it / upscroll re-shows. DELTA_THRESHOLD ignores
+		// tiny scroll jitter (trackpad inertia, slight wheel ticks).
+		const STICK_UNTIL = 100;
+		const DELTA_THRESHOLD = 30;
+		const HIDDEN_CLASS = "-translate-y-[150%]";
+		let lastY = window.scrollY;
+		let ticking = false;
+
+		function onScroll() {
+			const y = window.scrollY;
+			const delta = y - lastY;
+			// Always reflect "is scrolled" state for the color inversion,
+			// even on tiny deltas, so the pill flips immediately on first
+			// scroll.
+			header.dataset.scrolled = y > 8 ? "true" : "false";
+			if (Math.abs(delta) < DELTA_THRESHOLD) {
+				ticking = false;
+				return;
+			}
+			if (y <= STICK_UNTIL) {
+				header.classList.remove(HIDDEN_CLASS);
+			} else if (delta > 0) {
+				header.classList.add(HIDDEN_CLASS);
+			} else {
+				header.classList.remove(HIDDEN_CLASS);
+			}
+			lastY = y;
+			ticking = false;
+		}
+
+		window.addEventListener(
+			"scroll",
+			() => {
+				if (!ticking) {
+					window.requestAnimationFrame(onScroll);
+					ticking = true;
+				}
+			},
+			{ passive: true },
+		);
+	})();
+
+	const mobileToggle = document.querySelector("[data-mobile-nav-toggle]");
+	const mobileMenu = document.querySelector("[data-mobile-nav]");
+	if (mobileToggle && mobileMenu) {
+		mobileToggle.addEventListener("click", () => {
+			const isOpen = !mobileMenu.classList.contains("hidden");
+			mobileMenu.classList.toggle("hidden");
+			mobileToggle.setAttribute("aria-expanded", String(!isOpen));
+		});
+	}
+
+	const searchToggle = document.querySelector("[data-search-toggle]");
+	const searchOverlay = document.querySelector("[data-search-overlay]");
+	const searchInput = document.querySelector("[data-search-input]");
+	const searchClose = document.querySelector("[data-search-close]");
+
+	function openSearch() {
+		searchOverlay?.classList.remove("hidden");
+		searchToggle?.setAttribute("aria-expanded", "true");
+		setTimeout(() => searchInput?.focus(), 50);
+	}
+	function closeSearch() {
+		searchOverlay?.classList.add("hidden");
+		searchToggle?.setAttribute("aria-expanded", "false");
+	}
+
+	searchToggle?.addEventListener("click", openSearch);
+	searchClose?.addEventListener("click", closeSearch);
+	searchOverlay?.addEventListener("click", (e) => {
+		if (e.target === searchOverlay) closeSearch();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") closeSearch();
+		if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+			e.preventDefault();
+			openSearch();
+		}
+	});
+</script>

@@ -1,0 +1,82 @@
+---
+/**
+ * /our-products/ — placeholder archive listing for the Products CPT.
+ *
+ * Exists so the URL doesn't 404 at cutover (production WP has this page
+ * served by Bricks; we recreate it here as a minimal Astro listing). The
+ * real design replaces this when the Products archive layout lands.
+ */
+import MainLayout from "../layouts/MainLayout.astro";
+
+interface ProductNode {
+	id: string;
+	title: string;
+	uri: string;
+	excerpt?: string | null;
+	featuredImage?: { node?: { mediaItemUrl: string; altText: string } | null } | null;
+}
+
+const apiUrl = import.meta.env.WORDPRESS_API_URL;
+let products: ProductNode[] = [];
+try {
+	const response = await fetch(apiUrl, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			query: `query AllProducts {
+				products(first: 100) {
+					nodes {
+						id
+						title
+						uri
+						excerpt
+						featuredImage { node { mediaItemUrl altText } }
+					}
+				}
+			}`,
+		}),
+	});
+	const json = await response.json();
+	products = json?.data?.products?.nodes ?? [];
+} catch (err) {
+	// Best-effort listing — fall through to empty render so the page still
+	// builds even if WP is down at build time.
+	console.error("our-products: fetch failed", err);
+}
+---
+
+<MainLayout title="Our Products" description="Geosynthetic products manufactured and supplied by Ocean Geosynthetics.">
+	<section class="mx-auto max-w-6xl px-4 py-12">
+		<header class="mb-8">
+			<h1 class="text-3xl font-semibold">Our Products</h1>
+			<p class="mt-2 text-[var(--color-text-muted)]">
+				{products.length} product{products.length === 1 ? "" : "s"} in our catalog.
+			</p>
+		</header>
+
+		{products.length === 0 ? (
+			<p>No products to show.</p>
+		) : (
+			<ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				{products.map((p) => (
+					<li class="rounded border border-gray-200 p-4 transition hover:shadow">
+						<a href={p.uri} class="block">
+							{p.featuredImage?.node?.mediaItemUrl && (
+								<img
+									src={p.featuredImage.node.mediaItemUrl}
+									alt={p.featuredImage.node.altText || p.title}
+									class="mb-3 aspect-video w-full rounded object-cover"
+									loading="lazy"
+								/>
+							)}
+							<h2 class="text-lg font-medium" set:html={p.title} />
+							{p.excerpt && (
+								<div class="mt-2 text-sm text-[var(--color-text-muted)]" set:html={p.excerpt} />
+							)}
+						</a>
+					</li>
+				))}
+			</ul>
+		)}
+	</section>
+</MainLayout>

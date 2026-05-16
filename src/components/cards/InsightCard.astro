@@ -1,0 +1,71 @@
+---
+/**
+ * InsightCard — blog post tile for the Insights rail (and any future
+ * post grid). Image on top, then category badge + date, title, excerpt.
+ *
+ * The default class targets the homepage's horizontal scroll rail; pass
+ * `class` to override widths for a vertical grid layout.
+ */
+interface Props {
+	post: {
+		title: string;
+		uri: string;
+		date?: string;
+		excerpt?: string | null;
+		featuredImage?: { node?: { mediaItemUrl: string; altText: string } | null } | null;
+		categories?: { nodes?: { name: string; slug: string }[] | null } | null;
+	};
+	class?: string;
+}
+
+const {
+	post,
+	class: className = "flex w-[80%] shrink-0 sm:w-[55%] lg:w-[calc(50%-12px)]",
+} = Astro.props;
+
+function stripHtml(html: string | null | undefined): string {
+	if (!html) return "";
+	return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+const img = post.featuredImage?.node;
+const cat = post.categories?.nodes?.[0];
+---
+
+<a href={post.uri} class:list={["group flex-col flex", className]}>
+	<div class="relative aspect-[4/3] overflow-hidden rounded-image bg-paper-cool">
+		{img?.mediaItemUrl && (
+			<img
+				src={img.mediaItemUrl}
+				alt={img.altText || post.title}
+				class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+				loading="lazy"
+			/>
+		)}
+	</div>
+	<div class="mt-4 flex flex-wrap items-center gap-2">
+		{cat && (
+			<span class="inline-flex items-center rounded-pill border border-ink/10 bg-paper-cool/60 px-2.5 py-1 font-sans text-[11px] font-semibold text-ink">
+				{cat.name}
+			</span>
+		)}
+		{post.date && (
+			<span class="font-sans text-[11px] text-ink-mute">
+				{new Date(post.date).toLocaleDateString("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				})}
+			</span>
+		)}
+	</div>
+	<h3
+		class="mt-2 line-clamp-2 font-display text-lg font-semibold leading-snug text-ink"
+		set:html={post.title}
+	/>
+	{post.excerpt && (
+		<p class="mt-1.5 line-clamp-2 font-sans text-[13px] leading-relaxed text-ink-mute">
+			{stripHtml(post.excerpt)}
+		</p>
+	)}
+</a>

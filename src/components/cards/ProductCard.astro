@@ -1,0 +1,90 @@
+---
+/**
+ * ProductCard — dark catalog tile from the Our Products section.
+ * Image up top, title + excerpt + View detail pill below, on a dark
+ * surface with a subtle hover lift.
+ *
+ * `fallbackIconPath` is an SVG `d` string used when the product has no
+ * featured image. The homepage maps this from product URI via the
+ * PRODUCT_GLYPHS dictionary; pass nothing to render a generic empty state.
+ *
+ * The default class targets the homepage's horizontal scroll rail; pass
+ * `class` to override widths (e.g. for a vertical product grid).
+ */
+import ArrowIcon from "../ui/ArrowIcon.astro";
+
+interface Props {
+	product: {
+		title: string;
+		uri: string;
+		excerpt?: string | null;
+		featuredImage?: { node?: { mediaItemUrl: string; altText: string } | null } | null;
+	};
+	fallbackIconPath?: string;
+	class?: string;
+}
+
+const {
+	product,
+	fallbackIconPath,
+	class: className = "w-[85%] shrink-0 snap-start sm:w-[calc(50%-12px)] lg:w-[calc(25%-24px)]",
+} = Astro.props;
+
+function stripHtml(html: string | null | undefined): string {
+	if (!html) return "";
+	return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+const img = product.featuredImage?.node;
+---
+
+<a
+	href={product.uri}
+	class:list={[
+		"group relative flex flex-col overflow-hidden rounded-card border border-white/10 bg-[#2a2e34] transition-all duration-300 hover:border-white/25 hover:bg-[#30343a]",
+		className,
+	]}
+>
+	<div class="aspect-[16/10] w-full overflow-hidden bg-[#1c1f24]">
+		{img?.mediaItemUrl ? (
+			<img
+				src={img.mediaItemUrl}
+				alt={img.altText || product.title}
+				class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+				loading="lazy"
+			/>
+		) : (
+			<div class="flex h-full w-full items-center justify-center text-white/30">
+				<svg
+					class="h-12 w-12"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<path d={fallbackIconPath ?? "M4 6h16v4H4zM4 14h16v4H4z"} />
+				</svg>
+			</div>
+		)}
+	</div>
+	<div class="flex flex-1 flex-col gap-4 p-6 lg:p-7">
+		<div>
+			<h3
+				class="font-display text-base font-semibold leading-snug text-brand-accent lg:text-lg"
+				set:html={product.title}
+			/>
+			{product.excerpt && (
+				<p class="mt-2 line-clamp-2 font-sans text-[13px] leading-relaxed text-white">
+					{stripHtml(product.excerpt)}
+				</p>
+			)}
+		</div>
+		<span class="mt-auto inline-flex w-fit items-center gap-1.5 rounded-pill bg-brand-accent px-4 py-2 font-sans text-[13px] font-semibold text-ink transition-colors group-hover:bg-brand-accent-hover">
+			View detail
+			<ArrowIcon size="xs" />
+		</span>
+	</div>
+</a>

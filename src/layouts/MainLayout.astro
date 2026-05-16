@@ -1,0 +1,529 @@
+---
+interface Props {
+	title?: string;
+	description?: string;
+	showFooter?: boolean;
+	showWebVitals?: boolean;
+	/** URL of the page's LCP candidate (e.g. hero photo). When set, the
+	 *  layout emits a `<link rel="preload" as="image" fetchpriority="high">`
+	 *  in <head> so the image starts downloading before HTML parsing
+	 *  finishes the body. */
+	heroPreload?: string;
+	/** Per-page OG/Twitter card image override. */
+	ogImage?: string;
+	/** Per-page canonical URL override (rare; usually flows from RankMath). */
+	canonical?: string;
+}
+
+import { getNodeByURI } from "../lib/api";
+import { SEO } from "astro-seo";
+import { stripHtml } from "string-strip-html";
+// ClientRouter (Astro's view transitions / AJAX-style routing) was
+// removed: it added ~390ms to the JS critical path + a 79ms forced
+// reflow per Lighthouse, and the cross-fade between routes wasn't
+// load-bearing for any feature on this site.
+import { resolveSEO } from "../lib/seo";
+
+// Self-hosted variable fonts via @fontsource. Vite bundles these
+// into hashed /_astro/ chunks and emits matching font-preload hints,
+// which makes net LCP faster than hand-rolled @font-face rules
+// (tested both — Vite path wins by ~600ms LCP). The trade-off is
+// shipping all subset @font-face declarations (cyrillic, greek,
+// vietnamese, etc.) which inflates the CSS by ~10 KB; the browser
+// still only fetches the latin woff2 because of unicode-range gating,
+// so the runtime cost is just the parse, not the network.
+import "@fontsource-variable/inter/index.css";
+import "@fontsource-variable/inter-tight/index.css";
+
+import "../styles/styles.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import A11yManager from "../components/A11yManager.astro";
+import FloatingActions from "../components/ui/FloatingActions.astro";
+// React islands removed — DarkMode + WebVitalsMonitor were the only React
+// usages; both will be re-introduced as needed (vanilla JS) when the new
+// design lands. Removing the @astrojs/react integration shaves per-page
+// build cost noticeably.
+import { settingsQuery, navQuery } from "../lib/api";
+
+// Prefetch site settings and nav so we can show offline/fallback banner when needed
+const settingsResult = await settingsQuery();
+const navResult = await navQuery();
+const { generalSettings } = settingsResult.data;
+const showFallbackBanner =
+	settingsResult.fromFallback || navResult.fromFallback;
+const {
+	title,
+	description,
+	showFooter = true,
+	showWebVitals = import.meta.env.DEV, // Show Web Vitals in development by default
+	heroPreload,
+	ogImage,
+	canonical,
+} = Astro.props;
+
+// Only fetch node data if we have a URI parameter
+const uri = Astro.params.uri ? `/${Astro.params.uri}/` : undefined;
+const data = uri ? await getNodeByURI(uri) : { nodeByUri: null };
+const node = data.nodeByUri;
+
+// If we have a URI but WordPress returned no node, show 404
+if (uri && !node) {
+	return Astro.redirect("/404");
+}
+
+// Resolve the SEO chain: code overrides > platform > RankMath > fallback.
+// `node.databaseId` is the WP post id; `__typename` tells us which REST
+// path to hit (`/wp/v2/posts/{id}` vs `/wp/v2/pages/{id}`). For other
+// CPTs we'd extend the lookup table; today everything that ships through
+// MainLayout is either Post or Page.
+const nodeId =
+	(node as { databaseId?: number; postId?: number } | null)?.databaseId ??
+	(node as { databaseId?: number; postId?: number } | null)?.postId;
+const nodePostType =
+	node?.__typename === "Page" ? "pages" : "posts";
+
+// Default fallbacks come from WP general settings; node title/excerpt
+// only used when the page has node data to fall back to.
+const fallbackTitle =
+	title ||
+	(node?.title ? stripHtml(node.title).result : generalSettings.title);
+const fallbackDescription =
+	(description && stripHtml(description).result) ||
+	(node?.excerpt ? stripHtml(node.excerpt).result : null) ||
+	generalSettings.description;
+
+const seo = await resolveSEO({
+	uri,
+	postId: nodeId,
+	postType: nodePostType,
+	codeOverrides: {
+		// Only forward fields explicitly passed in by the page.
+		...(title ? { title } : {}),
+		...(description
+			? { description: stripHtml(description).result }
+			: {}),
+		...(canonical ? { canonical } : {}),
+		...(ogImage
+			? {
+					ogImage,
+					twitterImage: ogImage,
+				}
+			: {}),
+	},
+	fallback: {
+		title: fallbackTitle,
+		description: fallbackDescription,
+	},
+});
+
+// Compose the final values used in <head>. We skip the brand-suffix
+// append when:
+//  • the title came from RankMath/platform (editor wrote the full string)
+//  • the title equals the site title (e.g. homepage default fallback)
+//  • the title already contains the site name (avoid "Foo | Ocean | Ocean")
+const siteName = generalSettings.title;
+const titleStr = seo.title || siteName;
+const titleAlreadyHasBrand = titleStr
+	.toLowerCase()
+	.includes(siteName.toLowerCase());
+const generatedTitle =
+	seo.source === "rankmath" ||
+	seo.source === "platform" ||
+	titleStr === siteName ||
+	titleAlreadyHasBrand
+		? titleStr
+		: `${titleStr} | ${siteName}`;
+const cleanDescription = seo.description!;
+
+// Image precedence:
+//   1. RankMath FB image (if present in seo.ogImage)
+//   2. Per-page ogImage prop (already merged into seo.ogImage if set)
+//   3. Node featured image
+//   4. 1200×630 brand-aligned Unsplash crop (placeholder; swap for a
+//      designed asset by overriding via ogImage prop on a layout call,
+//      or replace this URL once a real /og-default.jpg lands).
+const OG_FALLBACK =
+	"/images/forest-aerial-1200.webp";
+const metaImage =
+	seo.ogImage || node?.featuredImage?.node?.mediaItemUrl || OG_FALLBACK;
+const twitterImageResolved = seo.twitterImage || metaImage;
+const ogTitleResolved = seo.ogTitle || generatedTitle;
+const ogDescriptionResolved = seo.ogDescription || cleanDescription;
+const twitterTitleResolved = seo.twitterTitle || generatedTitle;
+const twitterDescriptionResolved = seo.twitterDescription || cleanDescription;
+const twitterCardResolved = seo.twitterCard || "summary_large_image";
+
+// Robots — only emit if explicitly set (RankMath noindex/nofollow). Empty
+// = let crawlers do default behaviour (index, follow).
+const robotsResolved = seo.robots && seo.robots.length ? seo.robots.join(", ") : null;
+const canonicalResolved = seo.canonical || undefined;
+
+// JSON-LD Organization graph — site-wide constants.
+const orgSchema = {
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "Organization",
+			"@id": `${generalSettings.url}#organization`,
+			name: generalSettings.title,
+			url: generalSettings.url,
+			logo: `${generalSettings.url}/ocean-logo.svg`,
+			description: generalSettings.description,
+			sameAs: [
+				"https://www.linkedin.com/company/ocean-geosynthetics",
+				"https://www.facebook.com/oceangeosynthetics",
+			],
+		},
+		{
+			"@type": "WebSite",
+			"@id": `${generalSettings.url}#website`,
+			url: generalSettings.url,
+			name: generalSettings.title,
+			description: generalSettings.description,
+			publisher: { "@id": `${generalSettings.url}#organization` },
+			inLanguage: "en-IN",
+			potentialAction: {
+				"@type": "SearchAction",
+				target: {
+					"@type": "EntryPoint",
+					urlTemplate: `${generalSettings.url}/?s={search_term_string}`,
+				},
+				"query-input": "required name=search_term_string",
+			},
+		},
+	],
+};
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="generator" content={Astro.generator} />
+
+		{/* `<meta name="description">` is emitted by the <SEO> component
+		   below — keeping it here too would double-render the tag. */}
+		{robotsResolved && <meta name="robots" content={robotsResolved} />}
+		{canonicalResolved && <link rel="canonical" href={canonicalResolved} />}
+
+		{/* Single preconnect — fonts self-hosted, hero/sector imagery
+		   all local. The only third-party fetches left are WP-served
+		   featured images on inner pages. */}
+		<link
+			rel="preconnect"
+			href="https://oceangeosynthetics.com"
+			crossorigin
+		/>
+		{
+			heroPreload && (
+				<link
+					rel="preload"
+					as="image"
+					href={heroPreload}
+					fetchpriority="high"
+				/>
+			)
+		}
+
+		<!-- PWA support with manifest -->
+		<link rel="manifest" href="/manifest.json" />
+		<meta
+			name="theme-color"
+			content="#29aae1"
+			media="(prefers-color-scheme: light)"
+		/>
+		<meta
+			name="theme-color"
+			content="#121212"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta
+			name="apple-mobile-web-app-status-bar-style"
+			content="black-translucent"
+		/>
+
+		<SEO
+			title={generatedTitle}
+			description={cleanDescription}
+			openGraph={{
+				basic: {
+					title: ogTitleResolved,
+					type: "website",
+					image: metaImage,
+				},
+				optional: {
+					description: ogDescriptionResolved,
+					siteName: generalSettings.title,
+					locale: "en_IN",
+				},
+				image: {
+					url: metaImage,
+					alt: ogTitleResolved,
+				},
+			}}
+			twitter={{
+				...(import.meta.env.PUBLIC_X_SHARE_USER
+					? { creator: `@${import.meta.env.PUBLIC_X_SHARE_USER}` }
+					: {}),
+				card: twitterCardResolved,
+			}}
+			extend={{
+				// extending the default link tags
+				link: [
+					{ rel: "icon", href: "/ocean-logo.svg", type: "image/svg+xml" },
+					{ rel: "apple-touch-icon", href: "/ocean-logo.svg", type: "image/svg+xml" },
+					{ rel: "sitemap", href: "/sitemap-index.xml" },
+				],
+				// extending the default meta tags
+				meta: [
+					{ name: "twitter:image", content: twitterImageResolved },
+					{ name: "twitter:title", content: twitterTitleResolved },
+					{ name: "twitter:description", content: twitterDescriptionResolved },
+				],
+			}}
+		/>
+
+		<!-- JSON-LD: Organization + WebSite (site-wide). The Organization
+		     graph node makes the site eligible for the knowledge-graph card
+		     for branded queries; WebSite adds the sitelinks search box. -->
+		<script type="application/ld+json" set:html={JSON.stringify(orgSchema)} />
+
+		<!-- Add support for Astro:assets image optimization -->
+		<slot name="head" />
+		<title></title>
+	</head>
+
+	<body
+		class="min-h-screen text-ink"
+	>
+		{/* (goo SVG filter removed — header now uses sharp-edged shapes only) */}
+
+		<!-- Accessibility: Skip to content link -->
+		<a
+			href="#content"
+			class="absolute -top-14 left-0 z-[1030] bg-[#29aae1] px-3 py-2 text-white transition-[top] duration-150 focus:top-0"
+		>
+			Skip to content
+		</a>
+
+		<!-- Include the accessibility manager -->
+		<A11yManager />
+
+		{/* Fallback banner removed — navQuery always falls back on this site
+		    (no PRIMARY menu location registered in WP), and the cached
+		    NAV_FALLBACK is the intentional source of truth. */}
+
+		<!-- Loading spinner -->
+		<div class="loading-spinner" id="page-loader">
+			<div class="spinner"></div>
+		</div>
+
+		<Header
+			settings={settingsResult.data}
+			nav={navResult.data}
+			showBlogTag={node?.__typename === "Post"}
+			isSinglePost={node?.__typename === "Post" || node?.__typename === "Page"}
+		/>
+		<main id="content" class="w-full">
+			<slot />
+		</main>
+		{showFooter && <Footer />}
+
+		<FloatingActions />
+
+		{/* DarkMode + WebVitalsMonitor React islands stripped with the
+		    @astrojs/react integration. Re-add as plain script tags when the
+		    new design needs them. */}
+
+		<!-- Register service worker, initialize Web Vitals, and handle page transitions -->
+		<script
+			client:load
+			define:vars={{
+				isDev: import.meta.env.DEV,
+				isDebugEnabled: import.meta.env.PUBLIC_DEBUG === "true",
+			}}
+		>
+			// Define client-side logging utility
+			const clientLog = {
+				info: (message) => {
+					// Only log in development or when debugging is enabled
+					if (isDev || isDebugEnabled) {
+						console.info("[INFO]", message);
+					}
+				},
+				error: (message) => {
+					// Always log errors
+					console.error("[ERROR]", message);
+				},
+			};
+
+			// Page-loader spinner: shown briefly on `beforeunload` while
+			// the next document loads, hidden on initial `DOMContentLoaded`.
+			// Replaces the old astro:before-preparation/page-load/after-swap
+			// listeners that only fired with ClientRouter (now removed).
+			window.addEventListener("beforeunload", () => {
+				const loader = document.getElementById("page-loader");
+				if (loader) loader.classList.add("active");
+			});
+			document.addEventListener("DOMContentLoaded", () => {
+				const loader = document.getElementById("page-loader");
+				if (loader) loader.classList.remove("active");
+				setTimeout(() => {
+					if (window.resetDarkMode) {
+						window.resetDarkMode();
+					}
+				}, 200);
+			});
+
+			// Register service worker for PWA functionality
+			if ("serviceWorker" in navigator) {
+				window.addEventListener("load", () => {
+					navigator.serviceWorker
+						.register("/service-worker.js")
+						.then((registration) => {
+							// Only log in DEV or DEBUG mode
+							clientLog.info("SW registered successfully");
+
+							// Listen for updates
+							registration.addEventListener("updatefound", () => {
+								const newWorker = registration.installing;
+
+								// Notify user when new content is available
+								newWorker.addEventListener("statechange", () => {
+									if (
+										newWorker.state === "activated" &&
+										navigator.serviceWorker.controller
+									) {
+										// New service worker activated - new content is available
+										if (window.a11yManager) {
+											window.a11yManager.announce(
+												"New content is available. Refresh the page to update.",
+												true,
+											);
+										}
+									}
+								});
+							});
+						})
+						.catch((error) => {
+							// Always log errors
+							clientLog.error(`SW registration failed: ${error}`);
+						});
+				});
+			}
+
+			// Fix dark mode layer on initial page load
+			window.addEventListener("load", () => {
+				// Force fix any dark mode layer issues on initial page load
+				setTimeout(() => {
+					if (window.resetDarkMode) {
+						window.resetDarkMode();
+					} else {
+						// Fallback if resetDarkMode is not available yet
+						const isDarkModeActive = document.body.classList.contains(
+							"darkmode--activated",
+						);
+						// Use conditional logging based on environment
+						clientLog.info(
+							`Fallback darkmode fix, isDarkModeActive: ${isDarkModeActive}`,
+						);
+
+						// Handle both possible class names
+						const darkmodeLayer = document.querySelector(".darkmode-layer");
+						const darkmodeBackground = document.querySelector(
+							".darkmode-background",
+						);
+
+						if (!isDarkModeActive) {
+							// If dark mode is OFF
+							const hideStyle =
+								"opacity: 0 !important; pointer-events: none !important; mix-blend-mode: normal !important;";
+
+							if (darkmodeLayer) {
+								darkmodeLayer.setAttribute("style", hideStyle);
+							}
+
+							if (darkmodeBackground) {
+								darkmodeBackground.setAttribute("style", hideStyle);
+							}
+						} else {
+							// If dark mode is ON, reset styles to allow the library's toggle to work
+							if (darkmodeLayer) {
+								darkmodeLayer.removeAttribute("style");
+							}
+
+							if (darkmodeBackground) {
+								darkmodeBackground.removeAttribute("style");
+							}
+						}
+
+						// Log the elements found for debugging (only in dev/debug mode)
+						if (isDev || isDebugEnabled) {
+							console.group("Darkmode elements (fallback)");
+							console.dir({
+								layer: darkmodeLayer,
+								background: darkmodeBackground,
+								isDarkModeActive,
+							});
+							console.groupEnd();
+						}
+					}
+				}, 300);
+			});
+		</script>
+
+		<!-- Lenis smooth scroll + GSAP, site-wide. **Dynamic imports**
+		     so GSAP/Lenis ship as separate chunks loaded after `load` so
+		     they don't block FCP/LCP/TBT. Respects prefers-reduced-
+		     motion: users who opt out get native scroll. -->
+		<script>
+			async function initSmoothScroll(): Promise<void> {
+				const reduceMotion = window.matchMedia(
+					"(prefers-reduced-motion: reduce)",
+				).matches;
+				if (reduceMotion) return;
+
+				// Each `import()` becomes its own Vite chunk fetched only
+				// when this function runs.
+				const [{ default: Lenis }, { gsap }, { ScrollTrigger }] =
+					await Promise.all([
+						import("lenis"),
+						import("gsap"),
+						import("gsap/ScrollTrigger"),
+					]);
+
+				gsap.registerPlugin(ScrollTrigger);
+
+				const lenis = new Lenis({
+					lerp: 0.09,
+					wheelMultiplier: 1,
+					touchMultiplier: 1.4,
+				});
+
+				lenis.on("scroll", ScrollTrigger.update);
+				gsap.ticker.add((time: number) => lenis.raf(time * 1000));
+				gsap.ticker.lagSmoothing(0);
+
+				(window as unknown as { __lenis?: unknown }).__lenis = lenis;
+			}
+
+			const ric =
+				(window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+					.requestIdleCallback ||
+				((cb: () => void) => window.setTimeout(cb, 1));
+
+			if (document.readyState === "complete") {
+				ric(() => void initSmoothScroll());
+			} else {
+				window.addEventListener(
+					"load",
+					() => ric(() => void initSmoothScroll()),
+					{ once: true },
+				);
+			}
+		</script>
+	</body>
+</html>

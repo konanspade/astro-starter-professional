@@ -1,0 +1,7 @@
+/api/manifest.json  /manifest.json  307
+
+# @astrojs/sitemap emits sitemap-index.xml + sitemap-0.xml; rewrite the
+# canonical /sitemap.xml URL onto the index file so search engines and
+# WP plugins that hard-code "/sitemap.xml" still work. Status 200 =
+# rewrite (URL stays the same), not a 301/302 redirect.
+/sitemap.xml  /sitemap-index.xml  200

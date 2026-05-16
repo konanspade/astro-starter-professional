@@ -1,0 +1,70 @@
+/** @type {import('stylelint').Config} */
+export default {
+	extends: ["stylelint-config-standard"],
+	rules: {
+		"color-named": "never",
+		"font-family-name-quotes": null,
+		"font-weight-notation": "named-where-possible",
+		"function-url-quotes": "always",
+		"value-keyword-case": "lower",
+		"unit-disallowed-list": [],
+		"no-descending-specificity": null,
+		"no-duplicate-selectors": true,
+		"font-family-no-missing-generic-family-keyword": null,
+		"at-rule-no-unknown": [
+			true,
+			{
+				ignoreAtRules: [
+					"tailwind",
+					"apply",
+					"layer",
+					"theme",
+					"source",
+					"import",
+				],
+			},
+		],
+		"no-invalid-position-at-import-rule": null,
+		"comment-empty-line-before": null,
+		"property-no-unknown": [
+			true,
+			{ ignoreProperties: ["view-transition-name"] },
+		],
+		"declaration-block-no-redundant-longhand-properties": null,
+		"color-function-alias-notation": "without-alpha",
+		"property-no-vendor-prefix": null,
+		"selector-pseudo-class-no-unknown": [
+			true,
+			{
+				ignorePseudoClasses: [
+					"global",
+					"view-transition",
+					"view-transition-group",
+					"view-transition-image-pair",
+					"view-transition-new",
+					"view-transition-old",
+				],
+			},
+		],
+		"function-no-unknown": null,
+		"declaration-property-value-no-unknown": null,
+		"selector-no-vendor-prefix": null,
+		"alpha-value-notation": null,
+		"color-function-notation": "modern",
+		"shorthand-property-no-redundant-values": null,
+		"keyframes-name-pattern": null,
+		"rule-empty-line-before": null,
+		"at-rule-empty-line-before": null,
+		"media-feature-range-notation": null,
+		"import-notation": null,
+		"selector-class-pattern": [".*", {}],
+	},
+	ignoreFiles: ["node_modules/*", "dist/*"],
+	defaultSeverity: "error",
+	overrides: [
+		{
+			files: ["**/*.astro"],
+			customSyntax: "postcss-html",
+		},
+	],
+};

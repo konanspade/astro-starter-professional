@@ -1,0 +1,84 @@
+---
+/**
+ * /solutions/ — placeholder archive listing for the `solution` CPT.
+ * Mirrors sectors.astro / our-products.astro. Without this file, the
+ * URL falls through to [...uri].astro which can't render the WP
+ * post-type archive node (it returns __typename: ContentType, not a
+ * single content item) and the service worker serves offline.html
+ * as a fallback.
+ */
+import MainLayout from "../layouts/MainLayout.astro";
+
+interface SolutionNode {
+	id: string;
+	title: string;
+	uri: string;
+	excerpt?: string | null;
+	featuredImage?: { node?: { mediaItemUrl: string; altText: string } | null } | null;
+}
+
+const apiUrl = import.meta.env.WORDPRESS_API_URL;
+let solutions: SolutionNode[] = [];
+try {
+	const response = await fetch(apiUrl, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			query: `query AllSolutions {
+				solutions(first: 100) {
+					nodes {
+						id
+						title
+						uri
+						excerpt
+						featuredImage { node { mediaItemUrl altText } }
+					}
+				}
+			}`,
+		}),
+	});
+	const json = await response.json();
+	solutions = json?.data?.solutions?.nodes ?? [];
+} catch (err) {
+	console.error("solutions: fetch failed", err);
+}
+---
+
+<MainLayout
+	title="Solutions"
+	description="Engineered geosynthetic solutions across erosion control, drainage, coastal protection, soil reinforcement, tunneling and more."
+>
+	<section class="mx-auto max-w-6xl px-4 py-12">
+		<header class="mb-8">
+			<h1 class="text-3xl font-semibold">Solutions</h1>
+			<p class="mt-2 text-[var(--color-text-muted)]">
+				{solutions.length} solution{solutions.length === 1 ? "" : "s"}.
+			</p>
+		</header>
+
+		{solutions.length === 0 ? (
+			<p>No solutions to show.</p>
+		) : (
+			<ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				{solutions.map((s) => (
+					<li class="rounded border border-gray-200 p-4 transition hover:shadow">
+						<a href={s.uri} class="block">
+							{s.featuredImage?.node?.mediaItemUrl && (
+								<img
+									src={s.featuredImage.node.mediaItemUrl}
+									alt={s.featuredImage.node.altText || s.title}
+									class="mb-3 aspect-video w-full rounded object-cover"
+									loading="lazy"
+								/>
+							)}
+							<h2 class="text-lg font-medium" set:html={s.title} />
+							{s.excerpt && (
+								<div class="mt-2 text-sm text-[var(--color-text-muted)]" set:html={s.excerpt} />
+							)}
+						</a>
+					</li>
+				))}
+			</ul>
+		)}
+	</section>
+</MainLayout>

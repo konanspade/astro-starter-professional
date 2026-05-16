@@ -1,0 +1,90 @@
+---
+import { stripHtml } from "string-strip-html";
+import { Image } from "astro:assets";
+import PostMeta from "./PostMeta.astro";
+import { getSiteConfig } from "../lib/content";
+
+// Define types for component props
+interface Props {
+	post: {
+		title: string;
+		uri: string;
+		content: string;
+		featuredImage?: {
+			node?: {
+				mediaItemUrl: string;
+				altText: string;
+			};
+		};
+		// Other post properties used by PostMeta component
+		[key: string]: any;
+	};
+	/** Set for the first card in a list (above-the-fold) so the image gets fetchpriority="high" */
+	priority?: boolean;
+}
+
+const { post, priority = false } = Astro.props;
+
+// Get site configuration
+const siteConfig = await getSiteConfig();
+const showFeaturedImagesOnPostCard =
+	siteConfig?.data.showFeaturedImagesOnPostCard ?? true;
+
+// Extract clean excerpt for better display
+const excerpt = stripHtml(post.content.substring(0, 150)).result;
+const hasFeaturedImage =
+	post.featuredImage?.node?.mediaItemUrl && showFeaturedImagesOnPostCard;
+---
+
+<article
+	class="border-t border-[var(--color-border)] first:border-t-0 transition-transform duration-200 ease-in-out hover:-translate-y-0.5"
+	transition:name={`post-${post.id}`}
+>
+	<header>
+		{
+			hasFeaturedImage && (
+				<div class="mb-4 overflow-hidden rounded-lg">
+					<a href={post.uri} aria-label={`View ${post.title}`}>
+						<img
+							class="block h-auto w-full transition-transform duration-300 ease-in-out hover:scale-105"
+							src={post.featuredImage.node.mediaItemUrl}
+							alt={post.featuredImage.node.altText || post.title}
+							width="300"
+							height="200"
+							loading={priority ? "eager" : "lazy"}
+							decoding="async"
+							fetchpriority={priority ? "high" : undefined}
+							transition:name={`image-${post.id}`}
+						/>
+					</a>
+				</div>
+			)
+		}
+
+		<h2
+			class="post-title mt-4 mb-2 text-lg font-bold leading-tight"
+			transition:name={`title-${post.id}`}
+		>
+			<a
+				class="post-link text-[var(--color-link)] no-underline hover:underline hover:text-[var(--color-black)]"
+				href={post.uri}
+				aria-label={post.title}
+				rel="bookmark"
+			>
+				{post.title}
+			</a>
+		</h2>
+
+		<PostMeta post={post} />
+	</header>
+
+	<div class="post-content mt-4 text-base text-[var(--color-text)]">
+		<p>
+			{excerpt}... <a
+				href={post.uri}
+				class="read-more font-semibold text-[var(--color-link)] no-underline hover:underline hover:text-[var(--color-black)]"
+				>continue reading</a
+			>
+		</p>
+	</div>
+</article>

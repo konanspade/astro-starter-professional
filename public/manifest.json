@@ -1,0 +1,39 @@
+{
+  "name": "Ocean Geosynthetics",
+  "short_name": "Ocean Geosynthetics",
+  "description": "Best Non Woven Geosynthetics Engineering Solution Company India",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#29aae1",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "149x149",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://wp.matijaculjak.com/wp-content/uploads/2016/05/cropped-matija-culjak-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "https://wp.matijaculjak.com/wp-content/uploads/2016/05/matija-culjak-logo.png",
+      "sizes": "1200x628",
+      "type": "image/png"
+    }
+  ]
+}

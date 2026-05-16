@@ -1,0 +1,53 @@
+---
+import { stripHtml } from "string-strip-html";
+
+interface Props {
+	post: {
+		content: string;
+		date: string;
+		dateGmt: string;
+		[key: string]: unknown;
+	};
+	centered?: boolean;
+}
+
+const { post, centered = false } = Astro.props;
+
+const estimatedReadingTime = (postContent: string) => {
+	if (!postContent || postContent === "") {
+		return "less than a minute read";
+	}
+
+	const wordCount = stripHtml(postContent).result.trim().split(/\s+/).length;
+	const minutes = Math.trunc(wordCount / 250);
+
+	if (minutes >= 1) {
+		return `${minutes} minute${minutes === 1 ? "" : "s"} read`;
+	} else {
+		return "less than a minute read";
+	}
+};
+---
+
+{
+	post && (
+		<div
+			class={`post-meta flex flex-wrap items-center gap-1.5 text-sm leading-none text-[var(--color-text-muted)] ${centered ? "justify-center" : ""}`}
+		>
+			<svg
+				class="post-meta-icon h-4 w-4 shrink-0"
+				viewBox="0 0 512 512"
+				xmlns="http://www.w3.org/2000/svg"
+				aria-hidden="true"
+				fill="currentColor"
+			>
+				<path d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.1 0-216-96.9-216-216S136.9 40 256 40s216 96.9 216 216-96.9 216-216 216zm61.8-104.4-84.9-61.7c-3.1-2.3-4.9-5.9-4.9-9.7V116c0-6.6 5.4-12 12-12h32c6.6 0 12 5.4 12 12v141.7l66.8 48.6c5.4 3.9 6.5 11.4 2.6 16.8L334.6 365c-3.9 5.3-11.4 6.5-16.8 2.6z" />
+			</svg>
+			<time datetime={post.dateGmt} class="post-date published">
+				{new Date(post.date).toLocaleDateString()}
+			</time>
+			<span aria-hidden="true">-</span>
+			<span>{estimatedReadingTime(post.content)}</span>
+		</div>
+	)
+}

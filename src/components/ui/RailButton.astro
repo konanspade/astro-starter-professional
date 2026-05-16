@@ -1,0 +1,96 @@
+---
+/**
+ * RailButton — prev/next arrow button for horizontal scroll rails.
+ * Used by the industries tabs, the catalog rail, and the insights rail.
+ *
+ * Auto-hides at the corresponding edge via `data-at-start` / `data-at-end`
+ * attributes (set by the page-level scroll handler). Pass `data-*`
+ * attributes through Astro's `...rest` so the calling section can wire
+ * up its own selectors (e.g. `data-catalog-scroll-prev`).
+ *
+ * Variants:
+ *   - light (default) — white pill on light backgrounds (insights, industries)
+ *   - dark            — dashed white border on a dark section bg (catalog)
+ *
+ * Sizes: sm (h-8), md (h-9), lg (h-11).
+ */
+type Direction = "prev" | "next";
+type Variant = "light" | "dark";
+type Size = "sm" | "md" | "lg";
+
+interface Props {
+	direction: Direction;
+	variant?: Variant;
+	size?: Size;
+	ariaLabel: string;
+	class?: string;
+	[key: `data-${string}`]: string | undefined;
+}
+
+const {
+	direction,
+	variant = "light",
+	size = "md",
+	ariaLabel,
+	class: className = "",
+	...rest
+} = Astro.props;
+
+const SIZE_CLASS: Record<Size, string> = {
+	sm: "h-8 w-8",
+	md: "h-9 w-9",
+	lg: "h-11 w-11",
+};
+
+const VARIANT_CLASS: Record<Variant, string> = {
+	light:
+		"rounded-full border border-ink/10 bg-paper text-ink-mute shadow-[0_4px_14px_rgba(10,31,68,0.12)] hover:text-ink hover:shadow-[0_6px_18px_rgba(10,31,68,0.18)]",
+	dark: "rounded-md border border-dashed border-white/20 text-white/80 hover:border-white/40 hover:text-white",
+};
+
+// Light buttons fully hide at the edge (the rail's gradient mask already
+// hints there's more content). Dark buttons fade to 30% so the dashed
+// border still reads as a disabled control on the dark surface.
+const EDGE_CLASS = {
+	"prev:light":
+		"data-[at-start=true]:pointer-events-none data-[at-start=true]:opacity-0",
+	"prev:dark":
+		"data-[at-start=true]:pointer-events-none data-[at-start=true]:opacity-30",
+	"next:light":
+		"data-[at-end=true]:pointer-events-none data-[at-end=true]:opacity-0",
+	"next:dark":
+		"data-[at-end=true]:pointer-events-none data-[at-end=true]:opacity-30",
+} as const;
+const edgeAttr = EDGE_CLASS[`${direction}:${variant}` as keyof typeof EDGE_CLASS];
+
+const arrowPath = direction === "prev" ? "M9 2l-5 5 5 5" : "M5 2l5 5-5 5";
+
+const iconSize =
+	size === "lg" ? "h-4 w-4" : "h-3.5 w-3.5";
+---
+
+<button
+	type="button"
+	aria-label={ariaLabel}
+	class:list={[
+		"inline-flex items-center justify-center transition-all duration-200",
+		SIZE_CLASS[size],
+		VARIANT_CLASS[variant],
+		edgeAttr,
+		className,
+	]}
+	{...rest}
+>
+	<svg
+		class={iconSize}
+		viewBox="0 0 14 14"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<path d={arrowPath}></path>
+	</svg>
+</button>

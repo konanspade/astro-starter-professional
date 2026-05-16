@@ -1,0 +1,57 @@
+---
+
+---
+
+<div class="contact-form my-8">
+	<form
+		class="flex flex-wrap gap-6 [&_.hidden]:absolute [&_.hidden]:h-px [&_.hidden]:w-px [&_.hidden]:overflow-hidden [&_.hidden]:whitespace-nowrap [&_.hidden]:clip-[inset(50%)]"
+		netlify
+		netlify-honeypot="bot-field"
+		data-netlify-recaptcha="true"
+		name="contact-form"
+		method="POST"
+		action="/success"
+	>
+		<p class="hidden">
+			<label>
+				Don't fill this out if you're human: <input name="bot-field" />
+			</label>
+		</p>
+		<input type="hidden" name="form-name" value="contact-form" />
+		<label for="name" hidden>Name</label>
+		<input
+			id="name"
+			type="text"
+			name="name"
+			placeholder="Name"
+			required
+			class="basis-[calc(50%-0.75rem)] rounded-lg border border-ink px-6 py-4 text-base outline-none transition-colors duration-[0.4s] placeholder:text-ink/50 hover:border-brand focus:border-brand active:border-brand"
+		/>
+		<label for="email" hidden>Email</label>
+		<input
+			id="email"
+			type="email"
+			name="email"
+			placeholder="Email"
+			required
+			class="basis-[calc(50%-0.75rem)] rounded-lg border border-ink px-6 py-4 text-base outline-none transition-colors duration-[0.4s] placeholder:text-ink/50 hover:border-brand focus:border-brand active:border-brand"
+		/>
+		<label for="message" hidden>Message</label>
+		<textarea
+			id="message"
+			wrap="soft"
+			name="message"
+			required
+			placeholder="Message"
+			rows="7"
+			class="basis-full resize-none rounded-lg border border-ink px-6 py-4 text-base outline-none transition-colors duration-[0.4s] placeholder:text-ink/50 hover:border-brand focus:border-brand active:border-brand"
+		></textarea>
+		<div data-netlify-recaptcha="true"></div>
+		<button
+			type="submit"
+			class="contact-form-submit mx-auto cursor-pointer rounded-lg border-0 bg-brand px-6 py-4 text-base uppercase text-white transition-colors duration-[0.4s] hover:bg-brand/80"
+		>
+			Submit
+		</button>
+	</form>
+</div>

@@ -1,0 +1,77 @@
+---
+/**
+ * BulletList — accent-dot list. Two shapes:
+ *
+ *   - simple (default): `items` are strings. Renders dot + text per row.
+ *     Used by the Industries panel and the Solutions highlights column.
+ *
+ *   - rich: `items` are { title, body }. Renders dot + headline + body
+ *     per row, separated by dashed dividers. Used by the Why Us bullets.
+ *
+ * `dense` shrinks vertical rhythm for the highlights-column look.
+ */
+type Item = string | { title: string; body: string };
+
+interface Props {
+	items: Item[];
+	variant?: "simple" | "rich";
+	dense?: boolean;
+	class?: string;
+}
+
+const {
+	items,
+	variant = "simple",
+	dense = false,
+	class: className = "",
+} = Astro.props;
+---
+
+{
+	variant === "rich" ? (
+		<ul
+			class:list={[
+				"divide-y divide-dashed divide-ink/15",
+				className,
+			]}
+		>
+			{items.map((item) => {
+				const { title, body } = item as { title: string; body: string };
+				return (
+					<li class="flex gap-3 py-5">
+						<span class="mt-2 inline-block h-2 w-2 shrink-0 rounded-full bg-brand-accent" />
+						<div>
+							<h3 class="font-display text-base font-semibold text-ink sm:text-lg">
+								{title}
+							</h3>
+							<p class="mt-1.5 font-sans text-sm leading-relaxed text-ink-mute">
+								{body}
+							</p>
+						</div>
+					</li>
+				);
+			})}
+		</ul>
+	) : (
+		<ul class:list={[dense ? "space-y-3" : "space-y-3.5", className]}>
+			{items.map((item) => (
+				<li
+					class:list={[
+						"flex font-sans leading-relaxed text-ink-soft",
+						dense
+							? "items-center gap-2.5 text-sm"
+							: "items-start gap-3 text-[15px]",
+					]}
+				>
+					<span
+						class:list={[
+							"inline-block shrink-0 rounded-full bg-brand-accent",
+							dense ? "h-1.5 w-1.5" : "mt-2 h-2 w-2",
+						]}
+					/>
+					<span>{item as string}</span>
+				</li>
+			))}
+		</ul>
+	)
+}

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Block draft / preview / WP-admin paths in case they ever appear.
+Disallow: /wp-admin/
+Disallow: /wp-login.php
+Disallow: /?s=
+Disallow: /search
+
+Sitemap: https://oceangeosynthetics.com/sitemap-index.xml

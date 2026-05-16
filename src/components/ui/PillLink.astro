@@ -1,0 +1,68 @@
+---
+/**
+ * PillLink — rounded-pill anchor with a trailing arrow. Brand CTA used
+ * across every section.
+ *
+ * Variants:
+ *   - accent  (default) — lime green, dark text
+ *   - dark              — dark navy, white text
+ *   - framed            — accent green inside a thick white border (for
+ *                         floating/overlapping placements like Why Us)
+ *
+ * Sizes: sm | md | lg. `shadow` adds the soft glow used on the CTA banner.
+ * `arrowSize` defaults to xs on sm pills, sm otherwise.
+ */
+import ArrowIcon from "./ArrowIcon.astro";
+
+type Variant = "accent" | "dark" | "framed";
+type Size = "sm" | "md" | "lg";
+
+interface Props {
+	href: string;
+	variant?: Variant;
+	size?: Size;
+	shadow?: boolean;
+	class?: string;
+	ariaLabel?: string;
+}
+
+const {
+	href,
+	variant = "accent",
+	size = "md",
+	shadow = false,
+	class: className = "",
+	ariaLabel,
+} = Astro.props;
+
+const VARIANT_CLASS: Record<Variant, string> = {
+	accent:
+		"bg-brand-accent text-ink hover:bg-brand-accent-hover",
+	dark: "bg-ink text-white hover:bg-ink-soft",
+	framed:
+		"border-[6px] border-white bg-brand-accent text-ink hover:bg-brand-accent-hover",
+};
+
+const SIZE_CLASS: Record<Size, string> = {
+	sm: "px-5 py-2.5 text-sm",
+	md: "px-6 py-3 text-[15px]",
+	lg: "px-7 py-3.5 text-[15px]",
+};
+
+const arrowSize = size === "sm" ? "xs" : "sm";
+---
+
+<a
+	href={href}
+	aria-label={ariaLabel}
+	class:list={[
+		"inline-flex items-center gap-2 rounded-pill font-sans font-semibold transition",
+		VARIANT_CLASS[variant],
+		SIZE_CLASS[size],
+		shadow && "shadow-[0_10px_30px_rgba(157,224,59,0.25)]",
+		className,
+	]}
+>
+	<slot />
+	<ArrowIcon size={arrowSize} />
+</a>

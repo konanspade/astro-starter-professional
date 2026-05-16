@@ -1,0 +1,68 @@
+---
+/**
+ * SectionHeader — eyebrow + heading + optional CTA, the standard section
+ * intro pattern used across the homepage.
+ *
+ * `align` controls layout:
+ *   - left   (default) — eyebrow and heading hug the left edge; if a CTA
+ *                        slot is provided it sits to the right on lg.
+ *   - center           — eyebrow + heading centered, max-w-3xl. CTA slot
+ *                        is rendered below the heading, also centered.
+ *
+ * The heading itself is a slot because every section has a different
+ * accent-word arrangement; this component only owns the eyebrow + the
+ * surrounding flex layout.
+ */
+import Eyebrow from "./Eyebrow.astro";
+
+type Align = "left" | "center";
+type Tone = "light" | "dark";
+
+interface Props {
+	eyebrow: string;
+	align?: Align;
+	tone?: Tone;
+	class?: string;
+}
+
+const {
+	eyebrow,
+	align = "left",
+	tone = "light",
+	class: className = "",
+} = Astro.props;
+
+const eyebrowTone = tone === "dark" ? "white" : "mute";
+const hasCta = Astro.slots.has("cta");
+---
+
+{
+	align === "center" ? (
+		<div class:list={["mx-auto max-w-3xl text-center", className]}>
+			<Eyebrow label={eyebrow} tone={eyebrowTone} center />
+			<slot name="heading" />
+			{hasCta && (
+				<div class="mt-8 flex justify-center">
+					<slot name="cta" />
+				</div>
+			)}
+		</div>
+	) : (
+		<header
+			class:list={[
+				"flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between",
+				className,
+			]}
+		>
+			<div class="max-w-2xl">
+				<Eyebrow label={eyebrow} tone={eyebrowTone} />
+				<slot name="heading" />
+			</div>
+			{hasCta && (
+				<div class="shrink-0">
+					<slot name="cta" />
+				</div>
+			)}
+		</header>
+	)
+}

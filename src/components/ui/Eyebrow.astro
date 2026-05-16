@@ -1,0 +1,52 @@
+---
+/**
+ * Eyebrow — small label sitting above section headings.
+ * Sun glyph (lime accent) + uppercase letter-spaced text.
+ *
+ * Used everywhere on the homepage. Variants control the text color so
+ * it stays readable on light, dark, or blue-tinted backgrounds. Centered
+ * variant adds `mx-auto` so it sits inside a centered text column.
+ */
+type Tone = "mute" | "white" | "blue";
+
+interface Props {
+	label: string;
+	tone?: Tone;
+	center?: boolean;
+	class?: string;
+}
+
+const { label, tone = "mute", center = false, class: className = "" } = Astro.props;
+
+const TONE_CLASS: Record<Tone, string> = {
+	mute: "text-ink-mute",
+	white: "text-white/80",
+	blue: "text-brand-blue-deep",
+};
+---
+
+<div
+	class:list={[
+		"inline-flex items-center gap-2 font-sans text-[11px] font-semibold uppercase tracking-[0.18em]",
+		TONE_CLASS[tone],
+		center && "mx-auto",
+		className,
+	]}
+>
+	<svg
+		class="h-3.5 w-3.5 text-brand-accent"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<circle cx="12" cy="12" r="4"></circle>
+		<path
+			d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+		></path>
+	</svg>
+	{label}
+</div>

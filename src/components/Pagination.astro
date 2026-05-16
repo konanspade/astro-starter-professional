@@ -1,0 +1,47 @@
+---
+interface Props {
+	isHomepage?: boolean;
+	totalPosts?: number;
+	page?: Page;
+}
+
+import { Page } from "astro";
+import { settingsQuery } from "../lib/api";
+
+const { allSettings } = (await settingsQuery()).data;
+const { isHomepage, totalPosts, page } = Astro.props;
+
+function getPaginationText() {
+	let text = "Page ";
+
+	if (isHomepage) {
+		text += "1";
+
+		if (totalPosts) {
+			text += ` of ${Math.ceil(
+				totalPosts / allSettings.readingSettingsPostsPerPage,
+			)}`;
+		}
+	} else if (page) {
+		text += `${page.currentPage} of ${page.lastPage}`;
+	}
+
+	return text;
+}
+---
+
+<div
+	class="pagination flex flex-wrap items-center justify-center gap-5 py-2 text-sm text-gray-800 [&>a]:text-[#29aae1] [&>a]:hover:underline [&>a]:hover:text-[#192226]"
+>
+	{
+		!isHomepage && page.url.prev && (
+			<a href={page.url.prev === "/page" ? "/" : page.url.prev}>« Prev</a>
+		)
+	}
+	<span set:text={getPaginationText()} />
+	{
+		isHomepage || page.currentPage !== page.lastPage ? (
+			<a href={isHomepage ? "/page/2" : page.url.next}>Next »</a>
+		) : null
+	}
+</div>

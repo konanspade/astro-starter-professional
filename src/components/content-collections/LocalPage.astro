@@ -1,0 +1,84 @@
+---
+import { Image } from "astro:assets";
+import MainLayout from "../../layouts/MainLayout.astro";
+import { render, type CollectionEntry } from "astro:content";
+
+interface Props {
+	page: CollectionEntry<"pages">;
+}
+
+const { page } = Astro.props;
+const { Content } = await render(page);
+
+// Extract frontmatter data
+const { title, description, heroImage, publishDate, updatedDate } = page.data;
+
+// Format dates for display
+const formattedPublishDate = publishDate
+	? new Intl.DateTimeFormat("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		}).format(publishDate)
+	: null;
+
+const formattedUpdatedDate = updatedDate
+	? new Intl.DateTimeFormat("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		}).format(updatedDate)
+	: null;
+---
+
+<MainLayout title={title} description={description}>
+	<article class="local-page mx-auto max-w-[800px] px-4 py-8">
+		<header class="page-header mb-8 text-center">
+			<h1 class="page-title mb-2 text-[2.5rem] max-md:text-[2rem]">{title}</h1>
+			{
+				description && (
+					<p class="page-description mb-4 text-[1.2rem] text-[#666]">
+						{description}
+					</p>
+				)
+			}
+
+			{
+				publishDate && (
+					<div class="page-meta mt-4 text-sm text-[#777]">
+						<time datetime={publishDate.toISOString()}>
+							Published: {formattedPublishDate}
+						</time>
+						{updatedDate && updatedDate > publishDate && (
+							<time datetime={updatedDate.toISOString()}>
+								{" "}
+								(Updated: {formattedUpdatedDate})
+							</time>
+						)}
+					</div>
+				)
+			}
+		</header>
+
+		{
+			heroImage && (
+				<div class="hero-image my-8 overflow-hidden rounded-lg">
+					<img
+						class="block h-auto w-full"
+						src={heroImage}
+						alt={`Hero image for ${title}`}
+						width="1200"
+						height="600"
+						loading="eager"
+					/>
+				</div>
+			)
+		}
+
+		<div
+			class="page-content leading-relaxed [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:text-[1.8rem] [&_h2]:max-md:text-2xl [&_p]:mb-6 [&_ul]:mb-6 [&_ol]:mb-6 [&_ul]:pl-6 [&_ol]:pl-6 [&_li]:mb-2"
+		>
+			<Content />
+		</div>
+	</article>
+</MainLayout>

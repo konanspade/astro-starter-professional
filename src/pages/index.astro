@@ -1,0 +1,1724 @@
+---
+/**
+ * Homepage — layout cribbed from the Mivora reference, copy adapted to
+ * Ocean Geosynthetics, colors swapped to the live site's brand blue +
+ * orange palette. Sections (top to bottom):
+ *
+ *   1. Hero — full-bleed image, copy overlay, stats card
+ *   2. Mission intro — eyebrow + big heading + 3 image cards
+ *   3. Industries strip — title + 4 industry cards
+ *   4. Services (dark section) — 3 service cards on dark blue
+ *   5. Why us — 2 bullet boxes + supporting image, CTA
+ *   6. Stats strip — 4 numbers
+ *   7. Testimonials — 4 client quote cards
+ *   8. CTA banner — image bg, centered call to action
+ *
+ * Each section reuses the same brand tokens defined in
+ * src/styles/variables.css and exposed to Tailwind via @theme.
+ */
+import MainLayout from "../layouts/MainLayout.astro";
+import Eyebrow from "../components/ui/Eyebrow.astro";
+import PillLink from "../components/ui/PillLink.astro";
+import ArrowIcon from "../components/ui/ArrowIcon.astro";
+import SectionHeader from "../components/ui/SectionHeader.astro";
+import RailButton from "../components/ui/RailButton.astro";
+import BulletList from "../components/ui/BulletList.astro";
+import ProductCard from "../components/cards/ProductCard.astro";
+import CaseStudyCard from "../components/cards/CaseStudyCard.astro";
+import InsightCard from "../components/cards/InsightCard.astro";
+
+interface Node {
+	id: string;
+	title: string;
+	uri: string;
+	excerpt?: string | null;
+	date?: string;
+	featuredImage?: { node?: { mediaItemUrl: string; altText: string } | null } | null;
+	sectorBullets?: { bulletPoints?: { text: string }[] | null } | null;
+	categories?: { nodes?: { name: string; slug: string }[] | null } | null;
+	caseStudyStats?: { stats?: { value: string; label: string }[] | null } | null;
+}
+
+// Product visuals — top is a small accent-green glyph, bottom is a wider
+// white line illustration. Keyed by URI slug fragment so we can match
+// real WP product permalinks. Anything unmapped falls back to DEFAULT.
+type ProductGlyph = { topIcon: string; bottomArt: string };
+const PRODUCT_GLYPHS: Record<string, ProductGlyph> = {
+	"geotextile": {
+		topIcon: "M3 6h18M3 12h18M3 18h18M6 3v18M12 3v18M18 3v18",
+		bottomArt: "M2 24h60M2 16c10-4 20 4 30 0s20-4 28 0M2 32c10-4 20 4 30 0s20-4 28 0",
+	},
+	"geomembrane": {
+		topIcon: "M3 8c4-3 8 3 12 0s5-3 6-2M3 14c4-3 8 3 12 0s5-3 6-2M3 20c4-3 8 3 12 0s5-3 6-2",
+		bottomArt: "M2 28c10-6 20 6 30 0s20-6 30 0M2 18c10-6 20 6 30 0s20-6 30 0",
+	},
+	"pond-liner": {
+		topIcon: "M3 18c2-2 5-2 7 0s5 2 7 0 5-2 4 0M3 12c2-2 5-2 7 0s5 2 7 0 5-2 4 0M5 6h14",
+		bottomArt: "M4 32c10-4 20 4 30 0s20-4 28 0M8 24h48M12 16h40",
+	},
+	"geo-bags": {
+		topIcon: "M6 4l-1 4h14l-1-4M5 8l-2 12h18l-2-12M9 14h6",
+		bottomArt: "M16 8l-3 8h14l-3-8zM12 16l-2 16h26l-2-16zM22 22h6",
+	},
+	"gabion": {
+		topIcon: "M4 6h16v12H4zM4 10h16M4 14h16M8 6v12M12 6v12M16 6v12",
+		bottomArt: "M8 12h48v20H8zM8 18h48M8 26h48M16 12v20M28 12v20M40 12v20M52 12v20",
+	},
+	"geogrid": {
+		topIcon: "M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18",
+		bottomArt: "M4 8h56v24H4zM4 16h56M4 24h56M16 8v24M28 8v24M40 8v24M52 8v24",
+	},
+	"geo-composite": {
+		topIcon: "M3 8h18v3H3zM3 13h18v3H3zM3 18h18v3H3z",
+		bottomArt: "M4 12h56v3H4zM4 18h56v3H4zM4 24h56v3H4zM4 30h56v3H4z",
+	},
+	"erosion-control": {
+		topIcon: "M3 21h18M5 21v-6M9 21v-9M13 21v-7M17 21v-10M21 21v-5",
+		bottomArt: "M4 36h60M8 36v-10M14 36v-14M20 36v-9M26 36v-16M32 36v-12M38 36v-18M44 36v-11M50 36v-15M56 36v-13",
+	},
+	"geocell": {
+		topIcon: "M7 4l5 3v6l-5 3-5-3V7zM17 4l5 3v6l-5 3-5-3V7zM12 13l5 3v6l-5 3-5-3v-6z",
+		bottomArt: "M10 10l8 5v10l-8 5-8-5v-10zM26 10l8 5v10l-8 5-8-5v-10zM42 10l8 5v10l-8 5-8-5v-10zM18 25l8 5v10M34 25l8 5v10",
+	},
+	"plastic-cell": {
+		topIcon: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+		bottomArt: "M6 8h12v12H6zM22 8h12v12H22zM38 8h12v12H38zM6 24h12v12H6zM22 24h12v12H22zM38 24h12v12H38z",
+	},
+	"rockfall": {
+		topIcon: "M12 3l9 6v8l-9 4-9-4V9zM7 11l5 2 5-2",
+		bottomArt: "M32 6L60 22v14L32 44 4 36V22zM12 26l20 8 20-8M32 14l8 6",
+	},
+	"drain-cell": {
+		topIcon: "M4 4h16v16H4zM8 8v8M12 8v8M16 8v8",
+		bottomArt: "M4 8h56v24H4zM12 12v16M20 12v16M28 12v16M36 12v16M44 12v16M52 12v16",
+	},
+	"dimple-drain": {
+		topIcon: "M4 6c2-2 4-2 6 0s4 2 6 0 4-2 4-2M4 12c2-2 4-2 6 0s4 2 6 0 4-2 4-2M4 18c2-2 4-2 6 0s4 2 6 0 4-2 4-2",
+		bottomArt: "M4 14c4-4 8-4 12 0s8 4 12 0 8-4 12 0 8 4 12 0M4 24c4-4 8-4 12 0s8 4 12 0 8-4 12 0 8 4 12 0",
+	},
+	"clay-liner": {
+		topIcon: "M3 7h18M3 12h18M3 17h18M3 7l3-3 3 3 3-3 3 3 3-3 3 3",
+		bottomArt: "M4 14h56M4 22h56M4 30h56M4 14l6-6 6 6 6-6 6 6 6-6 6 6 6-6 6 6 6-6 6 6",
+	},
+	"biofloc": {
+		topIcon: "M4 6c0-2 16-2 16 0v12c0 2-16 2-16 0zM8 12c1-1 2 0 2 1M14 11c1-1 2 0 2 1",
+		bottomArt: "M6 10c0-3 52-3 52 0v22c0 3-52 3-52 0zM18 22c2-2 4 0 4 2M40 20c2-2 4 0 4 2M28 26c1 0 2 1 2 2",
+	},
+	"hail-net": {
+		topIcon: "M3 3l18 18M21 3L3 21M3 12h18M12 3v18",
+		bottomArt: "M4 4l56 32M60 4L4 36M4 20h56M32 4v32",
+	},
+	"geo-tube": {
+		topIcon: "M3 8c0-2 18-2 18 0v8c0 2-18 2-18 0zM7 12h10",
+		bottomArt: "M4 12c0-3 56-3 56 0v12c0 3-56 3-56 0zM8 18h48",
+	},
+	"pvc-geo-pipes": {
+		topIcon: "M3 12c0-3 18-3 18 0M3 12c0 3 18 3 18 0M9 6v12M15 6v12",
+		bottomArt: "M4 18c0-4 56-4 56 0M4 18c0 4 56 4 56 0M16 10v16M32 10v16M48 10v16",
+	},
+	"gccm": {
+		topIcon: "M3 6h18v3H3zM3 11h18v3H3zM3 16h18v3H3z",
+		bottomArt: "M4 10h56v4H4zM4 18h56v4H4zM4 26h56v4H4zM4 34h56v4H4z",
+	},
+	"geonet": {
+		topIcon: "M3 6l9 5 9-5M3 11l9 5 9-5M3 16l9 5 9-5",
+		bottomArt: "M4 10l28 8 28-8M4 18l28 8 28-8M4 26l28 8 28-8M4 34l28 8 28-8",
+	},
+};
+const DEFAULT_PRODUCT_GLYPH: ProductGlyph = {
+	topIcon: "M4 6h16v4H4zM4 14h16v4H4z",
+	bottomArt: "M4 14h56v6H4zM4 26h56v6H4z",
+};
+
+function getProductGlyph(uri: string | undefined): ProductGlyph {
+	if (!uri) return DEFAULT_PRODUCT_GLYPH;
+	for (const slug of Object.keys(PRODUCT_GLYPHS)) {
+		if (uri.includes(slug)) return PRODUCT_GLYPHS[slug];
+	}
+	return DEFAULT_PRODUCT_GLYPH;
+}
+
+const FALLBACK_SECTOR_BULLETS = [
+	"Engineered specs matched to site conditions and load case",
+	"Manufactured under ISO-aligned quality standards",
+	"On-site technical support and installation guidance",
+];
+
+// Hub diagram nodes — 6 representative solution categories arranged
+// around a dashed circle. label sits above each node, icon inside.
+const SOLUTIONS_HUB_NODES = [
+	{ label: "Erosion", icon: "M3 14l3-3 3 3 3-4 3 4 3-3 3 3M3 18h18" },
+	{ label: "Drainage", icon: "M12 3l5 7a5 5 0 1 1-10 0z" },
+	{ label: "Coastal", icon: "M2 14c4-3 6 3 10 0s6-3 10 0M2 18c4-3 6 3 10 0s6-3 10 0" },
+	{ label: "Retaining", icon: "M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" },
+	{ label: "Tunneling", icon: "M4 20V11a8 8 0 0 1 16 0v9M4 20h16M11 20v-5h2v5" },
+	{ label: "Landscape", icon: "M3 21c4-6 6-12 9-12s5 6 9 12M3 21h18M12 9V3" },
+];
+
+// Per-case-study stats for the Case Studies cards. Keyed by URI slug
+// fragment so we can match against the WP permalink. Each entry is
+// exactly two stat rows; if a case study isn't mapped here the card
+// renders without stats (still shows title, image, CTA).
+const CASE_STUDY_STATS: Record<string, { value: string; label: string }[]> = {
+	"reliance-bio-energy-project-reinforced-with-geogrid": [
+		{ value: "120 kN/m", label: "Geogrid tensile strength" },
+		{ value: "8 m", label: "Wall height reinforced" },
+	],
+	"hdpe-liner-rcc-project-chhatrapati-sambhaji-nagar": [
+		{ value: "1.5 mm", label: "HDPE liner spec" },
+		{ value: "0%", label: "Seepage loss" },
+	],
+};
+
+function getCaseStudyStats(node: Node): { value: string; label: string }[] {
+	// Prefer ACF-managed stats from the `caseStudyStats` field group when
+	// the editor has filled them in. Fall back to the in-repo map for any
+	// post that hasn't been seeded yet.
+	const acfStats = (node.caseStudyStats?.stats ?? [])
+		.filter((s): s is { value: string; label: string } =>
+			Boolean(s?.value && s?.label),
+		)
+		.slice(0, 2);
+	if (acfStats.length > 0) return acfStats;
+
+	const uri = node.uri;
+	if (!uri) return [];
+	for (const slug of Object.keys(CASE_STUDY_STATS)) {
+		if (uri.includes(slug)) return CASE_STUDY_STATS[slug];
+	}
+	return [];
+}
+
+// Right-column highlight list — short subset of the WP solutions
+// CPT, hand-picked for visual balance.
+const SOLUTIONS_HIGHLIGHTS = [
+	"Erosion control",
+	"Soil stabilisation",
+	"Drainage of structures",
+	"Coastal protection",
+	"Retaining walls",
+	"Rockfall protection",
+];
+
+const apiUrl = import.meta.env.WORDPRESS_API_URL;
+
+// Helper-plugin REST root, derived from the GraphQL endpoint host so we
+// don't have to maintain a second env var. Used for options-page reads
+// that wpgraphql-acf can't resolve cleanly (testimonials repeater).
+const wpRestRoot = apiUrl
+	? new URL("/wp-json/konanspade/v1", apiUrl).toString()
+	: null;
+const wpUser = import.meta.env.WP_APP_USERNAME;
+const wpPass = import.meta.env.WP_APP_PASSWORD;
+const wpAuthHeader = wpUser && wpPass
+	? `Basic ${Buffer.from(`${wpUser}:${wpPass}`).toString("base64")}`
+	: null;
+
+let products: Node[] = [];
+let sectors: Node[] = [];
+let recent: Node[] = [];
+let caseStudies: Node[] = [];
+let featuredCaseStudy: Node | null = null;
+let testimonials: { name: string; role: string; body: string }[] = [];
+
+try {
+	const response = await fetch(apiUrl, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			query: `query Homepage {
+				products(first: 12) {
+					nodes { id title uri excerpt featuredImage { node { mediaItemUrl altText } } }
+				}
+				sectors(first: 30) {
+					nodes {
+						id title uri excerpt
+						featuredImage { node { mediaItemUrl altText } }
+						sectorBullets { bulletPoints { text } }
+					}
+				}
+				posts(first: 8, where: {categoryNotIn: [16]}) {
+					nodes {
+						id title uri date excerpt
+						featuredImage { node { mediaItemUrl altText } }
+						categories { nodes { name slug } }
+					}
+				}
+				caseStudies: posts(first: 4, where: {categoryName: "case-studies"}) {
+					nodes {
+						id title uri date excerpt
+						featuredImage { node { mediaItemUrl altText } }
+						caseStudyStats { stats { value label } }
+					}
+				}
+				caseStudy: nodeByUri(uri: "/reliance-bio-energy-project-reinforced-with-geogrid/") {
+					... on Post { id title uri excerpt featuredImage { node { mediaItemUrl altText } } }
+				}
+			}`,
+		}),
+	});
+	const json = await response.json();
+	products = json?.data?.products?.nodes ?? [];
+	sectors = json?.data?.sectors?.nodes ?? [];
+	caseStudies = json?.data?.caseStudies?.nodes ?? [];
+	featuredCaseStudy = json?.data?.caseStudy ?? null;
+	// Insights rail excludes the `case-studies` category (id 16) at query
+	// level so we get a varied feed for the blog rail.
+	recent = json?.data?.posts?.nodes ?? [];
+} catch (err) {
+	console.error("homepage: fetch failed", err);
+}
+
+// Pull testimonials off the Global ACF options page via the helper
+// plugin REST endpoint. wpgraphql-acf v2's options-page bridge returns
+// null for repeaters in this site's setup, so we hit REST directly.
+// Falls back to the hardcoded TESTIMONIALS list if the call fails.
+if (wpRestRoot && wpAuthHeader) {
+	try {
+		// Cache-bust query string + no-cache headers — LiteSpeed in front
+		// of WP REST keeps a stale options-page response otherwise, so a
+		// fresh seed wouldn't reach the build.
+		const res = await fetch(
+			`${wpRestRoot}/acf/options/global?_t=${Date.now()}`,
+			{
+				headers: {
+					Authorization: wpAuthHeader,
+					"Cache-Control": "no-cache",
+					Pragma: "no-cache",
+				},
+			},
+		);
+		if (res.ok) {
+			const data = await res.json();
+			const items: { name: string; role: string; body: string }[] = Array.isArray(
+				data?.testimonials,
+			)
+				? data.testimonials
+				: [];
+			testimonials = items.filter(
+				(t) => t && t.name && t.role && t.body,
+			);
+		}
+	} catch (err) {
+		console.error("homepage: testimonials fetch failed", err);
+	}
+}
+
+// Strip HTML from WP excerpts before display
+function stripHtml(html: string | null | undefined): string {
+	if (!html) return "";
+	return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Static testimonials — replace with WP-driven content later if needed.
+const TESTIMONIALS = [
+	{
+		name: "Anil Verma",
+		role: "Project Engineer, NHAI",
+		body: "Ocean's geogrids held up across two monsoon cycles where alternatives failed. Specs were exactly as advertised.",
+	},
+	{
+		name: "Priya Menon",
+		role: "Site Director, Coastal Works",
+		body: "Their HDPE liner crew turned a 40-day install into 22 days without compromising weld quality. Repeat partner now.",
+	},
+	{
+		name: "Rakesh Iyer",
+		role: "MD, Tellus Infra",
+		body: "Technical team made spec adjustments mid-project that saved us 18% on geotextile spend with no performance loss.",
+	},
+	{
+		name: "Sneha Kapoor",
+		role: "Environmental Consultant",
+		body: "Got documentation, certifications, and on-site QA backup the same week we asked. Few suppliers operate this way.",
+	},
+];
+
+// Driving Change heading — server-rendered as per-letter spans so the GSAP
+// ScrollTrigger animation in <script> can stagger-reveal letter by letter.
+// `accent: true` words ride brand-accent (lime green) instead of ink.
+const DRIVING_CHANGE_WORDS: { word: string; accent?: boolean }[] = [
+	{ word: "At" },
+	{ word: "Ocean" },
+	{ word: "Geosynthetics," },
+	{ word: "we" },
+	{ word: "are" },
+	{ word: "redefining" },
+	{ word: "ground" },
+	{ word: "engineering" },
+	{ word: "with" },
+	{ word: "sustainable", accent: true },
+	{ word: "durability", accent: true },
+	{ word: "in" },
+	{ word: "every" },
+	{ word: "project." },
+];
+
+// Curated triptych for the Driving Change row — overrides the WP sector
+// featured images so the homepage stays on-brand even if WP editors swap
+// thumbnails. Aerial nature/infrastructure imagery to match the Mivora
+// reference. Order matches the sectors array (left, middle, right).
+const DRIVING_CHANGE_IMAGES: { src: string; alt: string }[] = [
+	{
+		src: "/images/forest-road-800.webp",
+		alt: "Aerial view of a road winding through forested terrain, sustainable infrastructure planning",
+	},
+	{
+		src: "/images/mountain-lake-800.webp",
+		alt: "Mountain reservoir lake, water-management projects using HDPE geomembrane liners",
+	},
+	{
+		src: "/images/forest-aerial-800.webp",
+		alt: "Misty mountain forest aerial, environment and erosion-control geosynthetics applications",
+	},
+];
+
+// Three feature items shown under the More About Us CTA. `icon` is a
+// raw SVG path string drawn inside a 24x24 viewBox.
+const DRIVING_CHANGE_FEATURES = [
+	{
+		label: "Engineered specs",
+		icon: "M3 4h18v4H3zM3 10h12v4H3zM3 16h18v4H3z",
+	},
+	{
+		label: "Certified quality",
+		icon: "M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6z",
+	},
+	{
+		label: "Worldwide delivery",
+		icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a14 14 0 0 1 0 20M12 2a14 14 0 0 0 0 20",
+	},
+];
+---
+
+{/* Hero image is self-hosted at /hero/dam-{800,1400,2400}.webp +
+   a JPG fallback. Preloading the 800w variant since mobile-first;
+   browsers picking the 1400/2400 from srcset still skip the preload
+   (a smaller URL match means the preload kept its slot). */}
+<MainLayout
+	title="Geosynthetics Manufacturers in India | Geomembranes & Geogrids by Ocean Geosynthetics"
+	description="India's leading geosynthetics manufacturer and exporter of geotextiles, geomembranes, geogrids and geocells. 3,000+ projects delivered, 14 sectors served, 25+ years of engineering depth."
+	heroPreload="/hero/dam-800.webp"
+>
+	{/* ============================================================ */}
+	{/* HERO — 100vh full bleed; copy top-anchored on the left, rich */}
+	{/* featured-case-study card on the right (links to the most     */}
+	{/* recent post in the "case-studies" WP category).              */}
+	{/* ============================================================ */}
+	<section class="relative min-h-[600px] w-full sm:min-h-[700px] sm:h-screen">
+		{/* Hero — self-hosted WebP variants on the CF Pages edge cache.   */}
+		{/* Mobile fetches ~67 KiB (800w) instead of the 255 KiB Unsplash */}
+		{/* 2400-wide. <picture> falls back to the JPG copy for browsers  */}
+		{/* without WebP (vanishingly few in 2026 but cheap to keep).      */}
+		<picture>
+			<source
+				type="image/webp"
+				srcset="/hero/dam-800.webp 800w, /hero/dam-1400.webp 1400w, /hero/dam-2400.webp 2400w"
+				sizes="100vw"
+			/>
+			<img
+				src="/hero/dam-1400.jpg"
+				width="2400"
+				height="1600"
+				alt="Hydroelectric reservoir dam: Ocean Geosynthetics geomembrane and geogrid infrastructure project in India"
+				class="absolute inset-0 h-full w-full object-cover [clip-path:inset(0)]"
+				fetchpriority="high"
+				decoding="async"
+			/>
+		</picture>
+		{/* Base dark overlay — keeps copy legible across the whole image */}
+		<div class="absolute inset-0 bg-black/35" aria-hidden="true"></div>
+		{/* Top fade — keeps header legible on lighter parts of the photo */}
+		<div
+			class="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-black/55 via-black/15 to-transparent"
+			aria-hidden="true"
+		>
+		</div>
+		{/* Side fade behind the headline area */}
+		<div
+			class="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-black/45 via-black/15 to-transparent"
+			aria-hidden="true"
+		>
+		</div>
+
+		{/* Headline pinned bottom-left, case-study card flush to hero's bottom edge on lg */}
+		<div
+			class="relative mx-auto h-full max-w-[var(--container-site)] px-5 pt-28 pb-10 sm:px-10 sm:pt-40 sm:pb-20 lg:px-12 lg:pt-32 lg:pb-0"
+		>
+			<div class="grid h-full grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+				{/* Headline + single CTA — bottom-anchored on desktop, kept elevated above the flush card */}
+				<div class="lg:col-span-7 lg:self-end lg:pb-24">
+					<h1
+						class="font-display text-[clamp(1.875rem,4.75vw,3.5rem)] font-bold leading-[1.05] tracking-tight text-white drop-shadow-lg"
+						aria-label="Geosynthetics Manufacturers in India, Exporter of Geomembranes and Geosynthetics."
+					>
+						Geosynthetics <span class="text-brand-accent">Manufacturers</span> In India, <span class="text-brand-accent">Exporter</span> Of Geomembranes &amp; Geosynthetics.
+					</h1>
+					<p
+						class="mt-6 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-accent drop-shadow"
+					>
+						Reliable &amp; High Quality Products
+					</p>
+					<p
+						class="mt-3 max-w-xl font-sans text-base text-white/90 drop-shadow sm:text-lg"
+					>
+						As a leading geosynthetic material supplier &amp; manufacturer in
+						India, we offer geosynthetic products including geotextile, geogrid,
+						geomembranes, geocomposite and geonets.
+					</p>
+					<div class="mt-8">
+						<PillLink href="/our-products/">See Our Products</PillLink>
+					</div>
+				</div>
+
+				{/* Featured case study card — bottom-aligned with the hero edge.
+				    The .blend-bottom-corners class carves concave quarter-circles
+				    out of the bottom-left/right so the card visually tucks into
+				    the hero's bottom edge instead of floating on top of it. */}
+				<div class="lg:col-span-4 lg:col-start-9 lg:self-end">
+					<a
+						href={featuredCaseStudy?.uri || "/case-studies/"}
+						class="card-bottom-tabs group relative block rounded-card bg-white p-5 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.35)] transition-shadow duration-300 hover:shadow-[0_22px_50px_-10px_rgba(0,0,0,0.45)] sm:p-6 lg:rounded-b-none lg:shadow-[0_-25px_50px_-15px_rgba(0,0,0,0.3)] lg:hover:shadow-[0_-30px_60px_-15px_rgba(0,0,0,0.4)]"
+					>
+						<p
+							class="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-mute"
+						>
+							Featured case study
+						</p>
+						<h3
+							class="mt-3 line-clamp-3 font-display text-base leading-snug font-semibold text-ink sm:text-[17px]"
+							set:html={featuredCaseStudy?.title ||
+								"How a 4-lane Himalayan highway used Ocean Geogrids to stabilize 8 km of weak embankment through two monsoon cycles."}
+						/>
+						<div
+							class="mt-4 aspect-[16/10] overflow-hidden rounded-xl bg-paper-cool"
+						>
+							<img
+								src={featuredCaseStudy?.featuredImage?.node?.mediaItemUrl ??
+									"/images/catalog-fallback-600.webp"}
+								alt={featuredCaseStudy?.featuredImage?.node?.altText ||
+									"Featured case study"}
+								class="h-full w-full object-cover"
+								loading="eager"
+							/>
+						</div>
+						<div class="mt-5 grid grid-cols-2 gap-4">
+							<div>
+								<p
+									class="font-display text-2xl leading-none font-bold text-ink sm:text-3xl"
+								>
+									120 kN/m
+								</p>
+								<p
+									class="mt-1.5 font-sans text-[11px] leading-snug text-ink-mute"
+								>
+									Geogrid tensile strength
+								</p>
+							</div>
+							<div>
+								<p
+									class="font-display text-2xl leading-none font-bold text-ink sm:text-3xl"
+								>
+									8 m
+								</p>
+								<p
+									class="mt-1.5 font-sans text-[11px] leading-snug text-ink-mute"
+								>
+									Wall height reinforced
+								</p>
+							</div>
+						</div>
+						<p
+							class="mt-5 inline-flex items-center gap-1.5 font-sans text-[13px] font-semibold text-brand-blue group-hover:gap-2"
+						>
+							Read case study
+							<ArrowIcon size="xs" class="transition-transform" />
+						</p>
+					</a>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* DRIVING CHANGE — Mivora-style post-hero block:                */}
+	{/*   • centered eyebrow + headline that scroll-reveals word-by-word */}
+	{/*   • 3 portrait sector cards in a row; middle card sits higher,   */}
+	{/*     and all three parallax up at different speeds on scroll      */}
+	{/*   • green pill "More about us" CTA centered under the cards      */}
+	{/*   • 3 small icon + label feature items                           */}
+	{/*   GSAP wiring lives in the <script> at the bottom of this file */}
+	{/* ============================================================ */}
+	<section
+		class="driving-change relative overflow-hidden bg-paper px-5 py-14 sm:px-8 sm:py-16 lg:px-10 lg:py-20"
+		data-dc-section
+	>
+		<div class="mx-auto max-w-[var(--container-site)]">
+			{/* Centered eyebrow + headline */}
+			<div class="mx-auto max-w-4xl text-center">
+				<Eyebrow label="Driving change" center />
+				<h2
+					class="mt-6 font-display text-[clamp(1.5rem,3.5vw,2.75rem)] font-medium leading-[1.25] tracking-tight text-ink"
+					data-dc-heading
+					aria-label={DRIVING_CHANGE_WORDS.map((w) => w.word).join(" ")}
+				>
+					{
+						DRIVING_CHANGE_WORDS.map((w, i) => (
+							<>
+								<span
+									aria-hidden="true"
+									class:list={[
+										"inline-block whitespace-nowrap",
+										w.accent && "text-brand-accent",
+									]}
+								>
+									{Array.from(w.word).map((ch) => (
+										<span class="dc-letter" data-dc-letter>{ch}</span>
+									))}
+								</span>
+								{i < DRIVING_CHANGE_WORDS.length - 1 && " "}
+							</>
+						))
+					}
+				</h2>
+			</div>
+
+			{/* 3-up image triptych with vertical stagger + scroll parallax */}
+			<div
+				class="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-10 lg:mt-20 lg:max-w-6xl lg:gap-12"
+			>
+				{
+					DRIVING_CHANGE_IMAGES.map((img, idx) => (
+						<div
+							class:list={[
+								"dc-col relative aspect-[3/4] overflow-hidden rounded-image will-change-transform",
+								(idx === 0 || idx === 2) &&
+									"sm:translate-y-[72px] lg:translate-y-[106px]",
+							]}
+							data-dc-col={idx}
+						>
+							<img
+								src={img.src}
+								alt={img.alt}
+								class="absolute inset-0 h-full w-full object-cover"
+								loading="lazy"
+							/>
+						</div>
+					))
+				}
+			</div>
+
+			{/* Centered green pill CTA */}
+			<div class="mt-12 flex justify-center lg:mt-16">
+				<PillLink href="/about/">More about us</PillLink>
+			</div>
+
+			{/* Feature row — 3 distinct icon+label items, tight & centered */}
+			<ul
+				class="mt-10 flex flex-wrap items-start justify-center gap-x-16 gap-y-6 text-center sm:gap-x-24 lg:gap-x-32"
+			>
+				{
+					DRIVING_CHANGE_FEATURES.map((f) => (
+						<li class="flex flex-col items-center gap-2.5 text-ink-mute">
+							<svg
+								class="h-5 w-5 text-brand-accent"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.75"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d={f.icon} />
+							</svg>
+							<span class="font-sans text-sm">{f.label}</span>
+						</li>
+					))
+				}
+			</ul>
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* INDUSTRIES WE SERVE — tabbed industries from WP `sectors`.    */}
+	{/* Pill tabs across the top swap the content card below; each   */}
+	{/* card shows the sector's image + title + excerpt + 3 generic  */}
+	{/* offering bullets. JS-driven tab switching at end of file.    */}
+	{/* ============================================================ */}
+	<section class="bg-paper-cool px-5 py-14 sm:px-10 sm:py-20 lg:px-12 lg:py-24">
+		<div class="mx-auto max-w-[var(--container-site)]">
+			<Eyebrow label="Industries we serve" tone="blue" />
+			<h2
+				class="mt-4 max-w-3xl font-display text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.15] tracking-tight text-ink"
+			>
+				Building <span class="text-brand-accent">stronger, more sustainable</span>
+				ground across diverse industries
+			</h2>
+
+			{/* Tabs row — wrapped so the right-edge fade overlay can sit  */}
+			{/* outside the scrollable container and not scroll with content. */}
+			{
+				sectors.length > 0 && (
+					<div class="relative mt-10">
+						<div
+							class="industries-tabs-rail flex gap-2 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+							role="tablist"
+							aria-label="Industries we serve"
+						>
+						{sectors.map((s, idx) => (
+							<button
+								type="button"
+								role="tab"
+								id={`industry-tab-${idx}`}
+								aria-controls={`industry-panel-${idx}`}
+								aria-selected={idx === 0 ? "true" : "false"}
+								data-state={idx === 0 ? "active" : "inactive"}
+								data-industry-tab={idx}
+								class="industries-tab group inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md border border-dashed border-ink/15 bg-paper-cool/60 py-1.5 pl-1.5 pr-4 font-sans text-[13px] font-medium text-ink transition-all duration-200 hover:border-ink/30 hover:bg-paper data-[state=active]:border-solid data-[state=active]:border-brand-accent data-[state=active]:bg-brand-accent data-[state=active]:text-ink data-[state=active]:shadow-[0_4px_12px_rgba(157,224,59,0.35)]"
+							>
+								<span
+									class="inline-flex h-7 w-7 items-center justify-center rounded-sm bg-paper text-ink-soft transition-colors group-data-[state=active]:bg-ink group-data-[state=active]:text-white"
+								>
+									<svg
+										class="h-3.5 w-3.5"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.75"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="12" cy="12" r="2.5" />
+										<path d="M12 4v2M12 18v2M4 12h2M18 12h2" />
+									</svg>
+								</span>
+								<span set:html={s.title} />
+							</button>
+						))}
+						</div>
+						{/* Edge fades — hint at horizontal scrollability. Each fade and  */}
+						{/* its arrow button mirror across left/right; both auto-hide via */}
+						{/* the data-at-{start,end} attributes the script flips on scroll. */}
+						<div
+							class="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-paper-cool to-transparent transition-opacity duration-200 data-[at-start=true]:opacity-0"
+							aria-hidden="true"
+							data-industries-fade="start"
+						/>
+						<div
+							class="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-paper-cool to-transparent transition-opacity duration-200 data-[at-end=true]:opacity-0"
+							aria-hidden="true"
+							data-industries-fade="end"
+						/>
+						<RailButton
+							direction="prev"
+							size="sm"
+							ariaLabel="Scroll industries backward"
+							class="absolute left-1 top-1/2 -translate-y-1/2 z-10"
+							data-industries-scroll-prev
+						/>
+						<RailButton
+							direction="next"
+							size="sm"
+							ariaLabel="Scroll industries forward"
+							class="absolute right-1 top-1/2 -translate-y-1/2 z-10"
+							data-industries-scroll-next
+						/>
+					</div>
+				)
+			}
+
+			{/* Panel card — full container width matching the tabs row above */}
+			<div
+				class="mt-8 rounded-card bg-paper p-6 shadow-sm sm:p-10 lg:p-14"
+			>
+				{
+					sectors.map((s, idx) => (
+						<div
+							role="tabpanel"
+							id={`industry-panel-${idx}`}
+							aria-labelledby={`industry-tab-${idx}`}
+							class:list={[
+								"industries-panel grid grid-cols-1 items-stretch gap-8 lg:grid-cols-[9fr_10fr] lg:gap-16",
+								idx !== 0 && "hidden",
+							]}
+							data-industry-panel={idx}
+						>
+							<div class="relative aspect-[3/2] overflow-hidden rounded-image bg-paper-cool">
+								<img
+									src={
+										s.featuredImage?.node?.mediaItemUrl ??
+										"/images/industries-fallback-800.webp"
+									}
+									alt={s.featuredImage?.node?.altText || s.title}
+									class="absolute inset-0 h-full w-full object-cover"
+									loading="lazy"
+								/>
+								{/* Soft overlay tames dramatic dark/saturated images */}
+								<div class="absolute inset-0 bg-gradient-to-tr from-black/15 via-transparent to-white/5" />
+							</div>
+							<div class="flex flex-col justify-between gap-8">
+								<div>
+									<h3
+										class="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
+										set:html={s.title}
+									/>
+									{s.excerpt && (
+										<div
+											class="mt-4 max-w-md font-sans text-[15px] leading-relaxed text-ink-mute"
+											set:html={s.excerpt}
+										/>
+									)}
+								</div>
+								{(() => {
+									const acfBullets = (s.sectorBullets?.bulletPoints ?? [])
+										.map((b) => b?.text)
+										.filter((t): t is string => Boolean(t && t.trim()));
+									const bullets = acfBullets.length > 0 ? acfBullets : FALLBACK_SECTOR_BULLETS;
+									return <BulletList items={bullets} />;
+								})()}
+							</div>
+						</div>
+					))
+				}
+			</div>
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* OUR CATALOG — dark navy carousel inspired by Mivora's services. */}
+	{/*   • bg-brand-blue-ink (deep navy)                              */}
+	{/*   • horizontal scroll w/ prev/next arrows in the header        */}
+	{/*   • each card: top small green icon, title, excerpt, View      */}
+	{/*     detail green pill, larger white-line illustration at bottom */}
+	{/* ============================================================ */}
+	<section class="bg-[#1c1f24] px-5 py-16 text-white sm:px-10 sm:py-20 lg:px-12 lg:py-28">
+		<div class="mx-auto max-w-[var(--container-site)]">
+			<header
+				class="mb-10 flex flex-col items-start justify-between gap-6 sm:mb-12 sm:gap-8 lg:flex-row lg:items-end"
+			>
+				<div class="max-w-xl">
+					<Eyebrow label="Our products" tone="white" />
+					<h2
+						class="mt-4 font-display text-[clamp(1.75rem,4vw,3.25rem)] font-semibold leading-[1.1] tracking-tight text-white"
+					>
+						Engineered geosynthetics
+						<span class="text-brand-accent">across our product range</span>
+					</h2>
+				</div>
+				<div class="flex items-center gap-3">
+					<RailButton
+						direction="prev"
+						variant="dark"
+						size="lg"
+						ariaLabel="Previous products"
+						data-catalog-scroll-prev
+					/>
+					<RailButton
+						direction="next"
+						variant="dark"
+						size="lg"
+						ariaLabel="Next products"
+						data-catalog-scroll-next
+					/>
+				</div>
+			</header>
+
+			{
+				products.length === 0 ? (
+					<p class="text-white/60">Catalog will appear here.</p>
+				) : (
+					<div
+						class="catalog-rail flex snap-x snap-mandatory gap-6 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-8"
+					>
+						{products.map((p) => (
+							<ProductCard
+								product={p}
+								fallbackIconPath={getProductGlyph(p.uri).topIcon}
+							/>
+						))}
+					</div>
+				)
+			}
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* WHY US — split layout: copy + bullets left, image right with */}
+	{/* a green pill CTA centered along the image's bottom edge.     */}
+	{/* ============================================================ */}
+	<section
+		class="bg-paper px-5 py-16 sm:px-10 sm:py-20 lg:px-12 lg:py-28"
+		data-anim-stagger
+	>
+		<div class="mx-auto max-w-[var(--container-site)]">
+			<div
+				class="grid grid-cols-1 items-stretch gap-12 lg:grid-cols-2 lg:gap-16"
+			>
+				{/* Both columns are anim-items so they fade up together as a pair. */}
+				{/* Left — eyebrow, heading, bullets */}
+				<div class="flex flex-col">
+					<Eyebrow label="Why choose us" />
+					<h2
+						class="mt-5 font-display text-[clamp(1.75rem,4vw,3.25rem)] font-semibold leading-[1.1] tracking-tight text-ink"
+					>
+						Why <span class="text-brand-accent">Ocean Global</span> is the
+						<span class="text-ink-mute">smarter</span> choice
+					</h2>
+
+					<BulletList
+						class="mt-6"
+						variant="rich"
+						items={[
+							{
+								title: "Engineering, not just supply",
+								body: "We start with your soil report and load case, not a price list. Recommendations come from real engineers who've spent time on site.",
+							},
+							{
+								title: "Made in India, exported worldwide",
+								body: "Owned manufacturing means consistent specs and quick lead times. We ship from our plants to projects across India and 20+ export markets.",
+							},
+							{
+								title: "Quality systems at every batch",
+								body: "ISO-aligned manufacturing, in-house lab testing and full COA documentation. The same QA pack reaches every project, every time.",
+							},
+						]}
+					/>
+				</div>
+
+				{/* Right — image with floating CTA. The image wrapper is its */}
+				{/* own block (clips the photo), and the pill is a SIBLING     */}
+				{/* outside that wrapper so overflow-hidden can't crop it.     */}
+				{/* `self-start` keeps the wrapper at the top of the row, so   */}
+				{/* `bottom-0` on the pill maps to the image's bottom edge.    */}
+				<div class="relative self-start">
+					<div class="relative aspect-[4/3] overflow-hidden rounded-image">
+						<img
+							src="/images/forest-aerial-1600.webp"
+							alt="Aerial view of engineered ground using Ocean Geosynthetics products on infrastructure projects"
+							class="absolute inset-0 h-full w-full object-cover"
+							loading="lazy"
+						/>
+					</div>
+					<PillLink
+						href="/about/"
+						variant="framed"
+						class="absolute bottom-0 left-1/2 z-10 w-[80%] -translate-x-1/2 translate-y-1/2 justify-center !px-6 !py-3.5 !text-sm shadow-[0_10px_30px_rgba(10,31,68,0.22)]"
+					>
+						More about us
+					</PillLink>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* SOLUTIONS — stats tiles + hub diagram. GSAP animates the     */}
+	{/* count-ups, the dashed perimeter circle, and the satellite    */}
+	{/* node pop-ins on enter. Hover on a node lights it up.         */}
+	{/* ============================================================ */}
+	<section
+		class="bg-paper-cool px-5 py-16 sm:px-10 sm:py-20 lg:px-12 lg:py-32"
+		data-solutions-section
+	>
+		<div class="mx-auto max-w-[var(--container-site)]">
+			{/* Eyebrow + heading, centred. Eyebrow matches Why-Choose-Us */}
+			{/* aesthetic: sun glyph + uppercase tracked label, no pill.   */}
+			<div class="mx-auto max-w-3xl text-center">
+				<Eyebrow label="Solutions in numbers" center />
+				<h2
+					class="mt-5 font-display text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.15] tracking-tight text-ink"
+				>
+					Driving measurable change across
+					<span class="text-ink-mute">every project, sector, and partner</span>
+				</h2>
+			</div>
+
+
+			{/* 3-col block: heading+CTA / hub diagram / paragraph + bullets */}
+			<div
+				class="mt-14 grid grid-cols-1 items-center gap-10 sm:mt-20 sm:gap-12 lg:grid-cols-12 lg:gap-12"
+			>
+				<div class="lg:col-span-3">
+					<h3
+						class="font-display text-[clamp(1.75rem,3.25vw,2.5rem)] font-semibold leading-[1.1] tracking-tight text-ink"
+					>
+						Engineered ground solutions powered by
+						<span class="text-brand-accent">innovation</span>
+					</h3>
+					<PillLink href="/solutions/" size="sm" class="mt-8">
+						Explore solutions
+					</PillLink>
+				</div>
+
+				{/* Hub diagram */}
+				<div class="flex items-center justify-center lg:col-span-6">
+					<svg
+						viewBox="0 0 440 440"
+						class="solutions-hub h-auto w-full max-w-[440px]"
+						aria-hidden="true"
+					>
+						{/* Dashed perimeter circle */}
+						<circle
+							cx="220"
+							cy="220"
+							r="170"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1"
+							stroke-dasharray="3 6"
+							class="text-ink/20"
+							data-hub-circle
+						/>
+						{/* Connecting lines from centre out to each satellite */}
+						{
+							SOLUTIONS_HUB_NODES.map((_n, i) => {
+								const angle = (i / SOLUTIONS_HUB_NODES.length) * 2 * Math.PI - Math.PI / 2;
+								const x = 220 + 170 * Math.cos(angle);
+								const y = 220 + 170 * Math.sin(angle);
+								return (
+									<line
+										x1="220"
+										y1="220"
+										x2={x.toFixed(2)}
+										y2={y.toFixed(2)}
+										stroke="currentColor"
+										stroke-width="0.8"
+										stroke-dasharray="2 4"
+										class="text-ink/15"
+										data-hub-line
+									/>
+								);
+							})
+						}
+						{/* Satellite nodes first — outer <g> positions, inner <g>   */}
+						{/* animates. Rendered before the centre hub so the central */}
+						{/* icon is never occluded by an overshooting node entry.   */}
+						{
+							SOLUTIONS_HUB_NODES.map((n, i) => {
+								const angle = (i / SOLUTIONS_HUB_NODES.length) * 2 * Math.PI - Math.PI / 2;
+								const x = 220 + 170 * Math.cos(angle);
+								const y = 220 + 170 * Math.sin(angle);
+								return (
+									<g transform={`translate(${x.toFixed(2)},${y.toFixed(2)})`}>
+										<g
+											class="solutions-hub-node cursor-default"
+											data-hub-node
+										>
+											<circle
+												r="28"
+												fill="white"
+												stroke="currentColor"
+												stroke-width="1.5"
+												class="solutions-hub-node-circle text-ink-mute"
+											/>
+											<svg
+												x="-11"
+												y="-11"
+												width="22"
+												height="22"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="1.6"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												class="solutions-hub-node-icon text-ink"
+											>
+												<path d={n.icon} />
+											</svg>
+											<text
+												y="50"
+												text-anchor="middle"
+												class="font-sans fill-current text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-mute"
+											>
+												{n.label}
+											</text>
+										</g>
+									</g>
+								);
+							})
+						}
+						{/* Central hub — last in the SVG so its icon is always on  */}
+						{/* top of the spinning perimeter and the connector lines. */}
+						<g transform="translate(220,220)">
+							<g data-hub-center>
+								<circle
+									r="34"
+									fill="white"
+									stroke="currentColor"
+									stroke-width="1.5"
+									class="text-ink-mute"
+								/>
+								<svg
+									x="-12"
+									y="-12"
+									width="24"
+									height="24"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.6"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="text-ink"
+								>
+									<path d="M3 12h2M19 12h2M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4" />
+									<circle cx="12" cy="12" r="4" />
+								</svg>
+							</g>
+						</g>
+					</svg>
+				</div>
+
+				<div class="lg:col-span-3">
+					<p class="font-sans text-base leading-relaxed text-ink-mute">
+						Our solutions span every part of the ground engineering
+						challenge, from coastal protection to landfill caps and
+						highway embankments to underground tunnels.
+					</p>
+					<BulletList items={SOLUTIONS_HIGHLIGHTS} dense class="mt-6" />
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<style>
+		/* Satellite hover — fill flips to brand green, stroke matches,
+		   and the inner icon flips to white for contrast. The transition
+		   is on each property individually so the colour change feels
+		   deliberate rather than abrupt. */
+		.solutions-hub-node-circle {
+			transition: fill 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+				stroke 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+				stroke-width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+		}
+		.solutions-hub-node-icon {
+			transition: color 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+		}
+		.solutions-hub-node:hover .solutions-hub-node-circle {
+			fill: var(--color-brand-accent);
+			color: var(--color-brand-accent);
+			stroke-width: 2;
+		}
+		.solutions-hub-node:hover .solutions-hub-node-icon {
+			color: white;
+		}
+
+		/* Testimonials marquee — translates the rail by half its width so
+		   the duplicated array seam is invisible. Linear ease so motion is
+		   constant; pause on hover so users can read a card without it
+		   sliding out from under them. Reduced-motion users get a static
+		   row with overflow-x scroll instead. */
+		.testimonial-rail {
+			animation: testimonial-marquee 50s linear infinite;
+		}
+		.testimonials-marquee:hover .testimonial-rail {
+			animation-play-state: paused;
+		}
+		@keyframes testimonial-marquee {
+			from {
+				transform: translateX(0);
+			}
+			to {
+				transform: translateX(-50%);
+			}
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.testimonial-rail {
+				animation: none;
+			}
+		}
+	</style>
+
+	{/* ============================================================ */}
+	{/* TESTIMONIALS — full-bleed dark image bg + CSS-marquee row of */}
+	{/* white quote cards. Cards loop seamlessly by duplicating the  */}
+	{/* TESTIMONIALS array twice. Pause on hover.                    */}
+	{/* ============================================================ */}
+	<section class="testimonials-section relative overflow-hidden py-16 sm:py-20 lg:py-28">
+		{/* Aerial bg + dark overlay */}
+		<img
+			src="/images/forest-aerial-1600.webp"
+			alt=""
+			aria-hidden="true"
+			class="absolute inset-0 h-full w-full object-cover"
+			loading="lazy"
+		/>
+		<div class="absolute inset-0 bg-black/70" aria-hidden="true"></div>
+
+		<div class="relative">
+			<div class="mx-auto max-w-3xl px-6 text-center sm:px-10 lg:px-12">
+				<Eyebrow label="Clients" tone="white" />
+				<h2
+					class="mt-5 font-display text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.15] tracking-tight text-white"
+				>
+					What our clients
+					<span class="text-brand-accent">say about Ocean Global</span>
+				</h2>
+				<p class="mt-4 font-sans text-sm leading-relaxed text-white/70 sm:text-base">
+					Trusted by infrastructure, environment, and water-management teams
+					across India and 20+ export markets.
+				</p>
+			</div>
+
+			{/* Marquee — full-bleed, fades softly at both edges so cards
+			    don't pop in/out abruptly. The rail itself contains the
+			    same TESTIMONIALS array twice for a seamless loop. */}
+			<div
+				class="testimonials-marquee relative mt-14 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]"
+			>
+				<ul class="testimonial-rail flex w-max gap-6">
+					{
+						(() => {
+							// Prefer live ACF testimonials; fall back to the in-file
+							// constants if the REST call hasn't populated them.
+							const source = testimonials.length > 0 ? testimonials : TESTIMONIALS;
+							// Duplicated for the seamless marquee loop.
+							return [...source, ...source].map((t, i) => (
+								<li
+									aria-hidden={i >= source.length ? "true" : undefined}
+									class="flex w-[320px] shrink-0 flex-col rounded-card bg-paper p-6 shadow-[0_18px_40px_-15px_rgba(0,0,0,0.45)]"
+								>
+								<div class="flex items-center gap-3">
+									<span class="flex h-10 w-10 items-center justify-center rounded-pill bg-brand-accent-soft font-display text-sm font-bold text-ink">
+										{t.name
+											.split(" ")
+											.map((n) => n[0])
+											.join("")}
+									</span>
+									<div>
+										<p class="font-display text-sm font-semibold text-ink">
+											{t.name}
+										</p>
+										<p class="font-sans text-[11px] text-ink-mute">{t.role}</p>
+									</div>
+								</div>
+								<p class="mt-4 font-sans text-sm leading-relaxed text-ink-soft">
+									&ldquo;{t.body}&rdquo;
+								</p>
+							</li>
+							));
+						})()
+					}
+				</ul>
+			</div>
+		</div>
+	</section>
+
+	{/* ============================================================ */}
+	{/* CASE STUDIES — 2-up split-card grid pulled from WP posts in   */}
+	{/* the `case-studies` category. Each card is its own internal    */}
+	{/* 2-col split: left = title + stats + CTA; right = image.       */}
+	{/* ============================================================ */}
+	{
+		caseStudies.length > 0 && (
+			<section class="bg-paper-cool px-5 py-16 sm:px-10 sm:py-20 lg:px-12 lg:py-28">
+				<div class="mx-auto max-w-[var(--container-site)]">
+					<SectionHeader eyebrow="Case studies" class="mb-10 sm:mb-12">
+						<h2
+							slot="heading"
+							class="mt-5 font-display text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.1] tracking-tight text-ink"
+						>
+							Sustainability delivered.{" "}
+							<span class="text-ink-mute">Impactful case studies</span>{" "}
+							from our clients.
+						</h2>
+						<PillLink slot="cta" href="/category/case-studies/" size="sm">
+							See all case studies
+						</PillLink>
+					</SectionHeader>
+
+					<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+						{caseStudies.slice(0, 2).map((cs, idx) => (
+							<CaseStudyCard
+								caseStudy={cs}
+								stats={getCaseStudyStats(cs)}
+								pillVariant={idx % 2 === 0 ? "dark" : "accent"}
+							/>
+						))}
+					</div>
+				</div>
+			</section>
+		)
+	}
+
+	{/* ============================================================ */}
+	{/* INSIGHTS — recent posts                                      */}
+	{/* ============================================================ */}
+	{
+		recent.length > 0 && (
+			<section class="bg-paper px-5 py-16 sm:px-10 sm:py-20 lg:px-12 lg:py-28">
+				<div class="mx-auto grid max-w-[var(--container-site)] grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+					{/* Left col — eyebrow + heading only. Arrows now overlay the rail. */}
+					<div class="lg:col-span-4">
+						<Eyebrow label="Our blog" />
+						<h2 class="mt-5 font-display text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.1] tracking-tight text-ink">
+							Inspiring insights for a smarter,{" "}
+							<span class="text-ink-mute">greener</span> future
+						</h2>
+					</div>
+
+					{/* Right col — horizontal scroll rail of post cards, with prev/next arrows overlaid on the side edges of the image row, like the screenshot. */}
+					<div class="relative lg:col-span-8">
+						<div
+							class="insights-rail flex scroll-smooth gap-5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-6"
+						>
+							{recent.map((p) => (
+								<InsightCard
+									post={p}
+									class="insights-card flex w-[80%] shrink-0 sm:w-[55%] lg:w-[calc(50%-12px)]"
+								/>
+							))}
+						</div>
+						{/* Arrows overlay the side edges of the rail, vertically       */}
+						{/* aligned with the card image (~1/3 down from rail top since  */}
+						{/* image is aspect-[4/3] then meta+title+excerpt below).       */}
+						<RailButton
+							direction="prev"
+							ariaLabel="Previous insights"
+							class="absolute left-2 top-[33%] z-10 hidden -translate-y-1/2 sm:inline-flex"
+							data-insights-scroll-prev
+						/>
+						<RailButton
+							direction="next"
+							ariaLabel="Next insights"
+							class="absolute right-2 top-[33%] z-10 hidden -translate-y-1/2 sm:inline-flex"
+							data-insights-scroll-next
+						/>
+					</div>
+				</div>
+			</section>
+		)
+	}
+
+	{/* ============================================================ */}
+	{/* TALK TO EXPERTS — boxed card with rounded corners (not       */}
+	{/* full-bleed). Aerial bg + green-tinted dark overlay, centred  */}
+	{/* copy, single green pill CTA.                                 */}
+	{/* ============================================================ */}
+	<section class="px-5 pb-12 sm:px-10 sm:pb-16 lg:px-12 lg:pb-24">
+		<div class="mx-auto max-w-[var(--container-site)]">
+			<div class="relative overflow-hidden rounded-image">
+				<img
+					src="/images/forest-aerial-1600.webp"
+					alt=""
+					aria-hidden="true"
+					class="absolute inset-0 h-full w-full object-cover"
+					loading="lazy"
+				/>
+				{/* Two-layer overlay — deep dark wash for legibility plus a */}
+				{/* faint accent-green tint to push the colour cast toward   */}
+				{/* the brand without losing contrast.                       */}
+				<div class="absolute inset-0 bg-black/55" aria-hidden="true"></div>
+				<div
+					class="absolute inset-0 bg-brand-accent/[0.08] mix-blend-overlay"
+					aria-hidden="true"
+				></div>
+
+				<div class="relative px-5 py-14 text-center sm:px-10 sm:py-20 lg:py-28">
+					<div class="mx-auto max-w-3xl">
+						<h2
+							class="font-display text-[clamp(2rem,4.5vw,3.5rem)] font-semibold leading-[1.15] tracking-tight text-white"
+						>
+							Join the mission for{" "}
+							<span class="text-brand-accent">stronger, more sustainable</span>{" "}
+							ground engineering.
+						</h2>
+						<p class="mt-5 font-sans text-base leading-relaxed text-white/80 sm:text-lg">
+							Let's work together to engineer durable foundations, optimise
+							materials, and deliver measurable impact on every project.
+						</p>
+						<PillLink href="/contact/" size="lg" shadow class="mt-8">
+							Talk to our experts
+						</PillLink>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+</MainLayout>
+
+{/* ===================================================================
+   Driving Change — GSAP ScrollTrigger animations
+   • Word reveal: each word in the heading fades from ink/15 → ink as the
+     section scrolls past, on scrub. Accent (lime) words simply ramp in
+     opacity since their color is already set inline.
+   • Dual-column parallax: left and right card columns translate up at
+     different speeds across the section's scroll range, producing the
+     Mivora "depth" effect. We respect prefers-reduced-motion by skipping
+     the parallax tweens entirely.
+   =================================================================== */}
+<script>
+	// Dynamic imports — GSAP/ScrollTrigger ship as their own Vite chunks
+	// fetched only when initHomepageAnimations runs (after `load` + idle
+	// slot). Keeps the main thread free during FCP/LCP/TBT measurement.
+
+	const reduceMotion = window.matchMedia(
+		"(prefers-reduced-motion: reduce)",
+	).matches;
+
+	async function initHomepageAnimations(): Promise<void> {
+		if (reduceMotion) return;
+		const [{ gsap }, { ScrollTrigger }] = await Promise.all([
+			import("gsap"),
+			import("gsap/ScrollTrigger"),
+		]);
+		gsap.registerPlugin(ScrollTrigger);
+
+	const section = document.querySelector<HTMLElement>("[data-dc-section]");
+	const heading = document.querySelector<HTMLElement>("[data-dc-heading]");
+	const letters = heading?.querySelectorAll<HTMLElement>("[data-dc-letter]");
+	const cols = document.querySelectorAll<HTMLElement>("[data-dc-col]");
+
+	if (heading && letters && letters.length) {
+		gsap.set(letters, { opacity: 0.15 });
+		gsap.to(letters, {
+			opacity: 1,
+			ease: "none",
+			stagger: 1, // even spread across the scroll progress
+			scrollTrigger: {
+				trigger: heading,
+				// Reveal completes by the time the heading reaches mid-viewport
+				// (≈ half a screen of scroll past first contact).
+				start: "top 75%",
+				end: "top 25%",
+				scrub: 0.4,
+			},
+		});
+	}
+
+	if (section && cols.length && !reduceMotion) {
+		// Side cards start statically pushed 72px (sm) / 106px (lg)
+		// below the middle card. Their parallax target rises slightly
+		// less than that distance over the section's scroll range, so
+		// side cards approach center but never cross above it.
+		const offsets = [-18, -2, -18];
+		cols.forEach((col, i) => {
+			gsap.to(col, {
+				yPercent: offsets[i] ?? -10,
+				ease: "none",
+				scrollTrigger: {
+					trigger: section,
+					start: "top bottom",
+					end: "bottom top",
+					scrub: true,
+				},
+			});
+		});
+	}
+
+	/* Industries tabs — toggle aria-selected on buttons and the hidden
+	   class on panels. Plain DOM, no framework, since the homepage is
+	   otherwise static. */
+	const industryTabs =
+		document.querySelectorAll<HTMLButtonElement>("[data-industry-tab]");
+	const industryPanels = document.querySelectorAll<HTMLElement>(
+		"[data-industry-panel]",
+	);
+	industryTabs.forEach((tab) => {
+		tab.addEventListener("click", () => {
+			const target = tab.dataset.industryTab;
+			industryTabs.forEach((t) => {
+				const active = t === tab;
+				t.setAttribute("aria-selected", active ? "true" : "false");
+				t.dataset.state = active ? "active" : "inactive";
+			});
+			industryPanels.forEach((p) => {
+				p.classList.toggle("hidden", p.dataset.industryPanel !== target);
+			});
+		});
+	});
+
+	/* Industries tab rail — symmetric prev/next arrows that auto-hide
+	   when the rail is at the corresponding edge. data-at-start /
+	   data-at-end attributes are mirrored across the buttons AND the
+	   matching fade overlays so both fade together. */
+	const industriesRail = document.querySelector<HTMLElement>(
+		".industries-tabs-rail",
+	);
+	const industriesPrev = document.querySelector<HTMLButtonElement>(
+		"[data-industries-scroll-prev]",
+	);
+	const industriesNext = document.querySelector<HTMLButtonElement>(
+		"[data-industries-scroll-next]",
+	);
+	const industriesFadeStart = document.querySelector<HTMLElement>(
+		'[data-industries-fade="start"]',
+	);
+	const industriesFadeEnd = document.querySelector<HTMLElement>(
+		'[data-industries-fade="end"]',
+	);
+	if (industriesRail && industriesPrev && industriesNext) {
+		const step = (): number =>
+			Math.max(industriesRail.clientWidth * 0.7, 200);
+
+		const updateEdgeState = (): void => {
+			const max = industriesRail.scrollWidth - industriesRail.clientWidth;
+			const atStart = industriesRail.scrollLeft <= 1;
+			const atEnd = max <= 1 || industriesRail.scrollLeft >= max - 1;
+			industriesPrev.dataset.atStart = atStart ? "true" : "false";
+			industriesNext.dataset.atEnd = atEnd ? "true" : "false";
+			if (industriesFadeStart) {
+				industriesFadeStart.dataset.atStart = atStart ? "true" : "false";
+			}
+			if (industriesFadeEnd) {
+				industriesFadeEnd.dataset.atEnd = atEnd ? "true" : "false";
+			}
+		};
+
+		industriesPrev.addEventListener("click", () => {
+			industriesRail.scrollBy({ left: -step(), behavior: "smooth" });
+		});
+		industriesNext.addEventListener("click", () => {
+			industriesRail.scrollBy({ left: step(), behavior: "smooth" });
+		});
+		industriesRail.addEventListener("scroll", updateEdgeState, { passive: true });
+		window.addEventListener("resize", updateEdgeState);
+		updateEdgeState();
+	}
+
+	/* Solutions section — stat count-up + hub draw-in. */
+	const solutionsSection = document.querySelector<HTMLElement>(
+		"[data-solutions-section]",
+	);
+	if (solutionsSection) {
+		// Hub diagram. Circle perimeter draws via stroke-dashoffset
+		//    trick (set dasharray = full circumference; offset = circ →
+		//    0). Lines fade in stagger; satellites pop in scale.
+		const circle = solutionsSection.querySelector<SVGCircleElement>(
+			"[data-hub-circle]",
+		);
+		const lines = solutionsSection.querySelectorAll<SVGLineElement>(
+			"[data-hub-line]",
+		);
+		const center = solutionsSection.querySelector<SVGGElement>(
+			"[data-hub-center]",
+		);
+		const nodes = solutionsSection.querySelectorAll<SVGGElement>(
+			"[data-hub-node]",
+		);
+
+		if (circle && nodes.length) {
+			// Perimeter circle draws via stroke-dashoffset. We swap the
+			// resting dashed pattern for a solid stroke during the draw,
+			// then restore on complete so the rest state is dashed again.
+			const restPattern = circle.getAttribute("stroke-dasharray") ?? "";
+			const r = parseFloat(circle.getAttribute("r") ?? "0");
+			const circumference = 2 * Math.PI * r;
+
+			gsap.set(circle, {
+				strokeDasharray: circumference,
+				strokeDashoffset: circumference,
+				opacity: 0,
+			});
+			gsap.set(center, {
+				scale: 0.4,
+				opacity: 0,
+				transformOrigin: "50% 50%",
+			});
+			gsap.set(nodes, {
+				scale: 0,
+				opacity: 0,
+				transformOrigin: "50% 50%",
+			});
+			gsap.set(lines, { opacity: 0 });
+
+			// Single timeline so everything shares pacing; defaultEase
+			// keeps motion smooth across every segment.
+			ScrollTrigger.create({
+				trigger: solutionsSection,
+				start: "top 65%",
+				once: true,
+				onEnter: () => {
+					const tl = gsap.timeline({
+						defaults: { ease: "expo.out" },
+						onComplete: () => {
+							// Once the diagram has assembled, start a slow,
+							// continuous rotation on the dashed perimeter so it
+							// reads as a living orbit rather than a static ring.
+							// Linear ease + long duration keeps it meditative.
+							// `svgOrigin` (GSAP-specific) sets the rotation
+							// centre in SVG user units, sidestepping the
+							// transform-box / transform-origin pitfalls CSS
+							// has with SVG circles. 220 220 = the circle's
+							// centre. Linear ease + long duration = meditative.
+							gsap.to(circle, {
+								rotation: 360,
+								duration: 60,
+								ease: "none",
+								repeat: -1,
+								svgOrigin: "220 220",
+							});
+						},
+					});
+
+					// 1. Perimeter — fade + draw simultaneously, slow, deliberate.
+					tl.to(circle, { opacity: 1, duration: 0.4 })
+						.to(
+							circle,
+							{
+								strokeDashoffset: 0,
+								duration: 1.6,
+								ease: "power2.inOut",
+								onComplete: () => {
+									circle.setAttribute("stroke-dasharray", restPattern);
+									circle.removeAttribute("stroke-dashoffset");
+								},
+							},
+							"<0.05",
+						);
+
+					// 2. Centre hub — soft scale-in once perimeter is well underway.
+					tl.to(
+						center,
+						{
+							scale: 1,
+							opacity: 1,
+							duration: 0.9,
+							ease: "back.out(1.4)",
+						},
+						"-=1.0",
+					);
+
+					// 3. Connector lines — soft stagger fade.
+					tl.to(
+						lines,
+						{
+							opacity: 1,
+							duration: 0.7,
+							stagger: { each: 0.08, from: "start" },
+						},
+						"-=0.55",
+					);
+
+					// 4. Satellites — float in with subtle Y rise, scaled stagger.
+					tl.fromTo(
+						nodes,
+						{ scale: 0, opacity: 0, y: 8 },
+						{
+							scale: 1,
+							opacity: 1,
+							y: 0,
+							duration: 0.85,
+							stagger: { each: 0.09, from: "start" },
+							ease: "back.out(1.5)",
+						},
+						"-=0.4",
+					);
+				},
+			});
+
+			// Hover — gentle scale + soft drop shadow via filter. The
+			// fill colour change comes from CSS so it benefits from the
+			// dedicated transition timing already declared there.
+			nodes.forEach((node) => {
+				node.addEventListener("mouseenter", () => {
+					gsap.to(node, {
+						scale: 1.08,
+						duration: 0.45,
+						ease: "expo.out",
+					});
+				});
+				node.addEventListener("mouseleave", () => {
+					gsap.to(node, {
+						scale: 1,
+						duration: 0.55,
+						ease: "expo.out",
+					});
+				});
+			});
+		}
+	}
+
+	/* Catalog rail — same prev/next pattern as the industries rail. */
+	const catalogRail = document.querySelector<HTMLElement>(".catalog-rail");
+	const catalogPrev = document.querySelector<HTMLButtonElement>(
+		"[data-catalog-scroll-prev]",
+	);
+	const catalogNext = document.querySelector<HTMLButtonElement>(
+		"[data-catalog-scroll-next]",
+	);
+	if (catalogRail && catalogPrev && catalogNext) {
+		// One click scrolls a full row of visible cards (4 on desktop,
+		// 2 on tablet, 1 on mobile). Using the rail's clientWidth keeps
+		// this responsive without hard-coding card counts per breakpoint.
+		const cardStep = (): number => catalogRail.clientWidth;
+		const updateCatalogEdges = (): void => {
+			const max = catalogRail.scrollWidth - catalogRail.clientWidth;
+			const atStart = catalogRail.scrollLeft <= 1;
+			const atEnd = max <= 1 || catalogRail.scrollLeft >= max - 1;
+			catalogPrev.dataset.atStart = atStart ? "true" : "false";
+			catalogNext.dataset.atEnd = atEnd ? "true" : "false";
+		};
+		catalogPrev.addEventListener("click", () => {
+			catalogRail.scrollBy({ left: -cardStep(), behavior: "smooth" });
+		});
+		catalogNext.addEventListener("click", () => {
+			catalogRail.scrollBy({ left: cardStep(), behavior: "smooth" });
+		});
+		catalogRail.addEventListener("scroll", updateCatalogEdges, { passive: true });
+		window.addEventListener("resize", updateCatalogEdges);
+		updateCatalogEdges();
+	}
+
+	/* Insights rail — same prev/next pattern. Step = clientWidth so
+	   one click advances exactly one screen of cards. */
+	const insightsRail = document.querySelector<HTMLElement>(".insights-rail");
+	const insightsPrev = document.querySelector<HTMLButtonElement>(
+		"[data-insights-scroll-prev]",
+	);
+	const insightsNext = document.querySelector<HTMLButtonElement>(
+		"[data-insights-scroll-next]",
+	);
+	if (insightsRail && insightsPrev && insightsNext) {
+		// One click advances by exactly ONE card (not the visible viewport
+		// width). Reads the first card's offsetWidth + the rail's column
+		// gap so it works at every breakpoint.
+		const step = (): number => {
+			const card = insightsRail.querySelector<HTMLElement>(".insights-card");
+			if (!card) return insightsRail.clientWidth;
+			const gap = parseInt(
+				getComputedStyle(insightsRail).columnGap || "20",
+				10,
+			);
+			return card.offsetWidth + gap;
+		};
+		const updateEdges = (): void => {
+			const max = insightsRail.scrollWidth - insightsRail.clientWidth;
+			const atStart = insightsRail.scrollLeft <= 1;
+			const atEnd = max <= 1 || insightsRail.scrollLeft >= max - 1;
+			insightsPrev.dataset.atStart = atStart ? "true" : "false";
+			insightsNext.dataset.atEnd = atEnd ? "true" : "false";
+		};
+		insightsPrev.addEventListener("click", () => {
+			insightsRail.scrollBy({ left: -step(), behavior: "smooth" });
+		});
+		insightsNext.addEventListener("click", () => {
+			insightsRail.scrollBy({ left: step(), behavior: "smooth" });
+		});
+		insightsRail.addEventListener("scroll", updateEdges, { passive: true });
+		window.addEventListener("resize", updateEdges);
+		updateEdges();
+	}
+	} // end initHomepageAnimations
+
+	// Schedule init after `load` + an idle slot. Animations only matter
+	// when the user starts scrolling — the eager-init cost was poisoning
+	// TBT.
+	const ricHome =
+		(window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+			.requestIdleCallback ||
+		((cb: () => void) => window.setTimeout(cb, 1));
+
+	if (document.readyState === "complete") {
+		ricHome(() => void initHomepageAnimations());
+	} else {
+		window.addEventListener(
+			"load",
+			() => ricHome(() => void initHomepageAnimations()),
+			{ once: true },
+		);
+	}
+</script>
