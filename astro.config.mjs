@@ -17,14 +17,15 @@ export default defineConfig({
 	],
 	vite: {
 		plugins: [tailwindcss()],
+		server: {
+			allowedHosts: true,
+		},
 		build: {
 			chunkSizeWarningLimit: 1000,
 		},
 		ssr: {
-			// Avoid ssr externalization to ensure compatibility
 			noExternal: ["react-icons"],
 		},
-		// Optimize CSS
 		css: {
 			devSourcemap: true,
 		},
